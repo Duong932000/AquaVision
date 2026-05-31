@@ -4,11 +4,9 @@ set -euxo pipefail
 
 cd "$(dirname "$0")"
 
-echo ""
 echo "========================================"
 echo " AquaVision Development Environment"
 echo "========================================"
-echo ""
 
 # Verify project files
 if [ ! -f "pyproject.toml" ]; then
@@ -94,26 +92,14 @@ echo "[INFO] Installing AquaVision dependencies..."
 uv sync --extra dev  --extra api --extra ml
 
 # Verify environment
-echo ""
 echo "[INFO] Installed packages:"
-echo ""
-
 uv pip list
-
-echo ""
 echo "[INFO] Python executable:"
-echo ""
-
 uv run which python
-
-echo ""
 echo "[INFO] Python version inside venv:"
-echo ""
 
 uv run python --version
 
-echo ""
 echo "========================================"
 echo " Setup Completed Successfully"
 echo "========================================"
-echo ""
