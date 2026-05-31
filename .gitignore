@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+
+# Dataset
+datasets/raw/
+datasets/processed/
+
+# Models
+models/*.pt
+models/*.onnx
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+logs/
+
+# OS
+.DS_Store
