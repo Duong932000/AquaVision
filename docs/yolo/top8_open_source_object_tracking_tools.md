@@ -97,3 +97,8 @@ Cần theo dõi các tiêu chí:
 - Deployment Constrainst: môi trừong mục tiêu, chẳng hạn như có GPU hay không, edge AI thì có thể lựa chọn loại tracking nào.
 
 - Scalability: Nếu hệ thống cần theo dõi cùng lúc nhiều đối tượng hoặc xử lý nhiều luồng video, tracker cần phải mở rộng quy mô một cách hiệu quả mà không bị giảm hiệu suất đáng kể.
+
+
+## References
+
+[1] Ultralytics: https://www.ultralytics.com/blog/top-8-open-source-object-tracking-tools-and-algorithms
