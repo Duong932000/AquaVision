@@ -6,8 +6,7 @@ __pycache__/
 .venv/
 
 # Dataset
-datasets/raw/
-datasets/processed/
+datasets/
 
 # Models
 models/*.pt
