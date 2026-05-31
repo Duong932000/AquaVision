@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aquavision"
+version = "0.1.0"
+description = "AI-powered fish tracking and monitoring platform for aquaculture"
+readme = "README.md"
+requires-python = ">=3.11"
+
+authors = [
+    { name = "Dac Duong" }
+]
+
+dependencies = [
+    "ultralytics>=8.3.0",
+    "opencv-python>=4.10.0",
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "pyyaml>=6.0.2",
+    "tqdm>=4.67.0",
+    "loguru>=0.7.3",
+]
+
+[project.optional-dependencies]
+
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.11.0",
+    "black>=25.0.0",
+    "mypy>=1.15.0",
+    "pre-commit>=4.2.0",
+]
+
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+]
+
+dashboard = [
+    "streamlit>=1.45.0",
+]
+
+ml = [
+    "scikit-learn>=1.6.0",
+]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

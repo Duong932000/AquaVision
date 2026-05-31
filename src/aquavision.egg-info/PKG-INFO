@@ -1,0 +1,136 @@
+Metadata-Version: 2.4
+Name: aquavision
+Version: 0.1.0
+Summary: AI-powered fish tracking and monitoring platform for aquaculture
+Author: Dac Duong
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: ultralytics>=8.3.0
+Requires-Dist: opencv-python>=4.10.0
+Requires-Dist: numpy>=2.0.0
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: pyyaml>=6.0.2
+Requires-Dist: tqdm>=4.67.0
+Requires-Dist: loguru>=0.7.3
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3.0; extra == "dev"
+Requires-Dist: pytest-cov>=6.0.0; extra == "dev"
+Requires-Dist: ruff>=0.11.0; extra == "dev"
+Requires-Dist: black>=25.0.0; extra == "dev"
+Requires-Dist: mypy>=1.15.0; extra == "dev"
+Requires-Dist: pre-commit>=4.2.0; extra == "dev"
+Provides-Extra: api
+Requires-Dist: fastapi>=0.115.0; extra == "api"
+Requires-Dist: uvicorn>=0.34.0; extra == "api"
+Provides-Extra: dashboard
+Requires-Dist: streamlit>=1.45.0; extra == "dashboard"
+Provides-Extra: ml
+Requires-Dist: scikit-learn>=1.6.0; extra == "ml"
+Dynamic: license-file
+
+# AquaVision -- AI-powered Fish Tracking and Monitoring Platform for Aquaculture
+
+
+## Overview
+
+AquaVision is an end-to-end computer vision platform designed for aquaculture environments
+
+The project focuses on real-time fish detectin, tracking, monitoring, and behavioral analytics using IP cameras and AI models
+
+The long-term vision is build a production-ready intelligent system for fish farms and RAS (Recirculating Aquaculture System)
+
+
+## Objectives
+
+- Real-time fish detection in tank of RAS
+
+- Multi-object fish tracking
+
+- Fish analysis
+
+- Biomass estimation
+
+- Feeding behavior monitoring
+
+- Health and anomaly detection
+
+- Farm intelligent dashboard
+
+- Multi-camera IP deployment ()
+
+
+## System Architecture
+
+```text
+IP Camera (RTSP)
+        │
+        ▼
+ YOLO11 Detection
+        │
+        ▼
+ ByteTrack Tracking
+        │
+        ▼
+Trajectory Database
+        │
+        ▼
+Fish Analytics
+        │
+        ▼
+Dashboard & Alerts
+```
+
+
+## Technology Stack
+
+### Computer Vision
+
+- Ultralytics YOLO (v8/v11)
+
+- OpenCV
+
+### Multi-Object Tracking (MOT)
+
+ByteTrack
+
+### Dataset & Annotation
+
+- Roboflow
+
+- Label Studio
+
+### Backend
+
+- Python 3.11+
+
+- FastAPI
+
+### Dashboard
+
+- Python Desktop App
+
+- Web: #TODO
+
+### Database
+
+PostgreSQL
+
+### Experiment Ttacking
+
+MLflow
+
+### Containerization
+
+- Docker
+- K8s
+
+
+## Roadmap
+
+Read more detail in `./ROADMAP.md`
+
+
+## Author and Maintainer
+
+Nguyen Dac Duong
