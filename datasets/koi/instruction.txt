@@ -1,0 +1,96 @@
+
+#--------------------------------------------------------------------------
+CHIẾN LƯỢC THU THẬP ẢNH CÁ KOI CÓ CÁC BIẾN THIÊN CẦN THIẾT TRONG DATASET
+#--------------------------------------------------------------------------
+
+
+Chiến lược chính là: COVERAGE > QUALITY
+
+
+# ----------------
+1. Góc nhìn 
+
+Top View    --> ~ 90%
+
+Side View   --> ~ 10%
+
+Vì camera RAS sẽ từ trên xuống (under camera sẽ là phase sau)
+
+
+# ----------------
+2. Mật độ cá 
+
+1 fish
+
+5 fish
+
+10 fish
+
+20 fish
+
+50 fish
+
+100 fish
+
+200 fish
+
+
+# ----------------
+3. Kích thước cá 
+
+Small KOI
+
+Medium KOI
+
+Large KOI
+
+
+# ----------------
+4. Điều kiện nước
+
+Đây là yếu tố cực kỳ quan trọng trong RAS
+
+- Clear water
+
+- Slight reflection
+
+- Ripple water
+
+- Aeration bubbles
+
+- Shadow
+
+
+# ----------------
+5. Điều kiện ánh sáng
+
+- Morning
+
+- Noon
+
+- Afternoon
+
+- Indoor light
+
+
+# ----------------
+6. Màu cá
+
+- Cá màu gì cũng lấy
+
+
+# ----------------
+7. Các loại data cần collect, cần hoàn thiện bảng dưới
+
+Status	Data Type	    Category	                    Collection Target	        Frame/Image Selection	Final Images
+☐	    YouTube Video	Top View - Clear Water	        5 videos (3-10 min/video)	~10 images/video	    50
+☐	    YouTube Video	Dense Fish (20-50 fish/frame)	4 videos (3-10 min/video)	~15 images/video	    60
+☐	    YouTube Video	Sparse Fish (1-5 fish/frame)	3 videos (3-10 min/video)	~13 images/video	    40
+☐	    YouTube Video	Reflection / Glare	            3 videos (3-10 min/video)	~10 images/video	    30
+☐	    YouTube Video	Water Ripple / Aeration	        2 videos (3-10 min/video)	~10 images/video	    20
+☐	    YouTube Video	Different Fish Sizes	        3 videos (3-10 min/video)	~10 images/video	    30
+☐	    Google Images	Background Diversity	        Search & download	        20 selected images	    20
+☐	    Google Images	Different Pond Types	        Search & download	        20 selected images	    20
+☐	    Google Images	Different Lighting Conditions	Search & download	        10 selected images	    30
+
+☐	    TOTAL		                                    20 YouTube Videos + External Images		            300 Images
