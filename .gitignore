@@ -7,6 +7,7 @@ __pycache__/
 
 # Dataset
 datasets/
+Koi_dataset.yolov11/
 
 # Models
 models/*.pt

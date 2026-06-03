@@ -16,4 +16,3 @@ read -rp "Duration (seconds) [300]: " DURATION
 DURATION="${DURATION:-300}"
 
 python $REPO_ROOT/helpers/download_youtube_video.py --url "$URL" --fish-type "$FISH_TYPE" --duration "$DURATION"
-
