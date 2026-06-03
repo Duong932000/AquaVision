@@ -3,9 +3,9 @@ import cv2
 import yt_dlp
 
 
-YOUTUBE_URL = "https://www.youtube.com/watch?v=hglFXyqTAO8"
+YOUTUBE_URL = "https://www.youtube.com/watch?v=MkaVR2VfpFE"
 
-MODEL_PATH = "models/raw/yolo11l.pt"
+MODEL_PATH = "runs/detect/runs/koi_detection-3/weights/best.pt"
 
 TRACKER = "bytetrack.yaml"
 
@@ -26,7 +26,7 @@ def get_video_stream_url(url: str) -> str:
 
 def main():
 
-    print("Loading model...")
+    print(f"Loading model: {MODEL_PATH}")
 
     model = YOLO(MODEL_PATH)
 
