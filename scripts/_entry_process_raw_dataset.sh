@@ -21,4 +21,3 @@ python "$REPO_ROOT/helpers/process_raw_dataset.py" --fish-type "$FISH_TYPE" --fr
 
 echo "[INFO] Dataset generated:"
 echo "datasets/${FISH_TYPE}/processed/dataset.${FISH_TYPE}.v${VERSION}"
-

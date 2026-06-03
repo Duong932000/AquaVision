@@ -138,7 +138,7 @@ def youtube_video_downloader():
         "yt-dlp",
         "--format",
         (
-            "bestvideo[height<=1080]+bestaudio"
+            "bestvideo[vcodec*=avc1][height<=1080]+bestaudio/best[height<=1080]"
             "/best[height<=1080]"
             "/best"
         ),
