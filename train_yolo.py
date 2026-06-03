@@ -6,9 +6,9 @@ def main():
     model = YOLO("yolo11n.pt")
 
     results = model.train(
-        data="Koi_dataset.yolov11/data.yaml",
+        data="koi.annotation.v1.yolov11/data.yaml",
         epochs=60,
-        imgsz=1280,
+        imgsz=640,
         batch=8,
         device=0,
         workers=8,
