@@ -46,6 +46,7 @@ dashboard = [
 
 ml = [
     "scikit-learn>=1.6.0",
+    "kagglehub>=0.3.12",
 ]
 
 [tool.black]

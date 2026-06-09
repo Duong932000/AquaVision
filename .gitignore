@@ -34,3 +34,13 @@ models/raw/
 
 # train folder
 runs/
+
+
+# Example datasets
+# examples/dataset/
+
+# Kaggle cache
+.kaggle/
+
+# src
+src/aquavision.egg-info/
