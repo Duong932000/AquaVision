@@ -1,4 +1,4 @@
-# POTHOLE SEGMENTATION USING ULTRALYTICS YOLO26
+# POTHOLES SEGMENTATION USING ULTRALYTICS YOLO26
 
 This is an example to use YOLO26 segmentation model to train Potholde detection
 
