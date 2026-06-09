@@ -7,7 +7,7 @@ from pathlib import Path
 def download_kaggle_dataset():
     repo_root = Path(__file__).resolve().parent
 
-    dataset_dir = repo_root / "dataset" / "pothole"
+    dataset_dir = repo_root / "dataset" / "raw"
 
     downloaded_path = Path(kagglehub.dataset_download("sachinpatel21/pothole-image-dataset"))
     print(f"[INFO] Dataset downloaded to: {downloaded_path}")
