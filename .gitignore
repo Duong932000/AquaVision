@@ -37,7 +37,7 @@ runs/
 
 
 # Example datasets
-# examples/dataset/
+examples/dataset/
 
 # Kaggle cache
 .kaggle/
