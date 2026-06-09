@@ -159,8 +159,9 @@ Nếu Bounding Box đủ chính xác:
 
 ## Mục tiêu đề xuất cho AquaVision
 
-Metric | Target
-Precision | > 90%
-Recall | > 85%
-mAP | > 90%
-mAP50-95 | >80%
+| Metric | Target |
+|----------|----------|
+| Precision | > 90% |
+| Recall | > 85% |
+| mAP50 | > 90% |
+| mAP50-95 | > 80% |
