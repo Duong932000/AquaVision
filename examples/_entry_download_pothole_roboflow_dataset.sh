@@ -9,4 +9,4 @@ cd "$REPO_ROOT"
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
-yolo task=segment mode=train data="$REPO_ROOT/examples/dataset/roboflow/Pothole-Detection-1/data.yaml" model="yolo26n-seg.pt" epochs=100 imgsz=640
+python $REPO_ROOT/examples/download_pothole_roboflow_dataset.py
