@@ -1,0 +1,152 @@
+{
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-240s-20260603_214803.mp4": {
+        "size": 47381629,
+        "mtime": 1780498133.9668748,
+        "processed_at": "2026-06-13T12:59:27.413154",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_211320.mp4": {
+        "size": 103677858,
+        "mtime": 1780496157.1354282,
+        "processed_at": "2026-06-13T12:59:28.863978",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_212629.mp4": {
+        "size": 109928312,
+        "mtime": 1780496869.1195393,
+        "processed_at": "2026-06-13T12:59:34.518675",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_212907.mp4": {
+        "size": 176465962,
+        "mtime": 1780497111.2426102,
+        "processed_at": "2026-06-13T12:59:35.597778",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214106.mp4": {
+        "size": 2112805,
+        "mtime": 1780497669.228205,
+        "processed_at": "2026-06-13T12:59:36.712169",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214243.mp4": {
+        "size": 1107363,
+        "mtime": 1780497766.7522485,
+        "processed_at": "2026-06-13T12:59:37.979648",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214506.mp4": {
+        "size": 4349957,
+        "mtime": 1780497910.7687566,
+        "processed_at": "2026-06-13T12:59:38.723705",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214633.mp4": {
+        "size": 3682578,
+        "mtime": 1780497996.6607895,
+        "processed_at": "2026-06-13T12:59:40.159467",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214702.mp4": {
+        "size": 2900012,
+        "mtime": 1780498026.7323465,
+        "processed_at": "2026-06-13T12:59:40.565223",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214724.mp4": {
+        "size": 9426429,
+        "mtime": 1780498047.5438025,
+        "processed_at": "2026-06-13T12:59:42.792540",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_214944.mp4": {
+        "size": 12188204,
+        "mtime": 1780498187.4741535,
+        "processed_at": "2026-06-13T12:59:43.643660",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260603_222821.mp4": {
+        "size": 176063296,
+        "mtime": 1780500658.1337037,
+        "processed_at": "2026-06-13T12:59:44.706125",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260613_121441.mp4": {
+        "size": 216449670,
+        "mtime": 1781327840.5302289,
+        "processed_at": "2026-06-13T12:59:45.947260",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m12s-duration-300s-20260603_213232.mp4": {
+        "size": 209442106,
+        "mtime": 1780497323.298578,
+        "processed_at": "2026-06-13T12:59:46.911588",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m40s-duration-300s-20260603_211614.mp4": {
+        "size": 81835079,
+        "mtime": 1780496300.867235,
+        "processed_at": "2026-06-13T12:59:49.858282",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-17m21s-duration-300s-20260613_122314.mp4": {
+        "size": 163648737,
+        "mtime": 1781328358.3309636,
+        "processed_at": "2026-06-13T12:59:50.812447",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-18m24s-duration-300s-20260613_121820.mp4": {
+        "size": 179917808,
+        "mtime": 1781328063.1118252,
+        "processed_at": "2026-06-13T12:59:51.860940",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-120s-20260613_215045.mp4": {
+        "size": 61668399,
+        "mtime": 1781362313.6558383,
+        "processed_at": "2026-06-13T21:59:41.732796",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-120s-20260613_215224.mp4": {
+        "size": 84115382,
+        "mtime": 1781362408.7342389,
+        "processed_at": "2026-06-13T21:59:43.461717",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-120s-20260613_215420.mp4": {
+        "size": 68684227,
+        "mtime": 1781362524.0239153,
+        "processed_at": "2026-06-13T21:59:44.672378",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-180s-20260613_214417.mp4": {
+        "size": 108101913,
+        "mtime": 1781361959.9000692,
+        "processed_at": "2026-06-13T21:59:45.770739",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-180s-20260613_214634.mp4": {
+        "size": 102883642,
+        "mtime": 1781362090.121248,
+        "processed_at": "2026-06-13T21:59:46.922324",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260613_213850.mp4": {
+        "size": 93356852,
+        "mtime": 1781361707.6876597,
+        "processed_at": "2026-06-13T21:59:48.414519",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m00s-duration-300s-20260613_215645.mp4": {
+        "size": 159668541,
+        "mtime": 1781362760.891018,
+        "processed_at": "2026-06-13T21:59:49.451699",
+        "frames_extracted": 15
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m12s-duration-120s-20260613_214831.mp4": {
+        "size": 52445580,
+        "mtime": 1781362180.686677,
+        "processed_at": "2026-06-13T21:59:50.473850",
+        "frames_extracted": 14
+    }
+}

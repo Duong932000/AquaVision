@@ -9,7 +9,9 @@ __pycache__/
 !datasets/koi/
 datasets/koi/*
 !datasets/koi/instruction.txt
-koi.annotation.v1.yolov11/
+# Keep metadata folder
+!datasets/koi/metadata/
+!datasets/koi/metadata/*.json
 
 # Models
 *.pt
