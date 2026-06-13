@@ -148,5 +148,29 @@
         "mtime": 1781362180.686677,
         "processed_at": "2026-06-13T21:59:50.473850",
         "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m10s-duration-180s-20260613_221718.mp4": {
+        "size": 144194733,
+        "mtime": 1781363945.3965483,
+        "processed_at": "2026-06-13T22:19:25.065545",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m29s-duration-180s-20260613_221319.mp4": {
+        "size": 107309291,
+        "mtime": 1781363704.6807687,
+        "processed_at": "2026-06-13T22:19:26.216753",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-00m37s-duration-300s-20260613_221051.mp4": {
+        "size": 160686462,
+        "mtime": 1781363579.1419191,
+        "processed_at": "2026-06-13T22:19:27.718129",
+        "frames_extracted": 14
+    },
+    "/home/dacduong/git/AquaVision/datasets/koi/raw/videos/koi-start-02m30s-duration-180s-20260613_221540.mp4": {
+        "size": 75373945,
+        "mtime": 1781363805.4004207,
+        "processed_at": "2026-06-13T22:19:29.429150",
+        "frames_extracted": 14
     }
 }
