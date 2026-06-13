@@ -99,11 +99,25 @@ def youtube_video_downloader():
     parser.add_argument("--fish-type", required=True, help="Fish type (e.g. koi_fish, eel, tilapia)")
     parser.add_argument("--start-time", default="00:00", help="Start time (MM:SS or HH:MM:SS)")
     parser.add_argument("--duration", type=int, default=300, help="Duration to download in seconds")
+    parser.add_argument("--max-resolution", default="best", help="Maximum video resolution (e.g. 1080p, 720p, best)")
     parser.add_argument("--output-dir", default=None, help="Custom output directory")
     args = parser.parse_args()
 
     start_seconds = time_to_seconds(args.start_time)
     end_seconds = start_seconds + args.duration
+
+    if args.max_resolution == "best":
+        format_string = (
+            "bestvideo[vcodec*=avc1]+bestaudio"
+            "/bestvideo+bestaudio"
+            "/best"
+        )
+    else:
+        format_string = (
+            f"bestvideo[height<={args.max_resolution}]"
+            "+bestaudio"
+            "/best"
+        )
 
     if args.output_dir is None:
         output_dir = Path(f"datasets/{args.fish_type.lower()}/raw/videos")
@@ -137,11 +151,7 @@ def youtube_video_downloader():
     cmd = [
         "yt-dlp",
         "--format",
-        (
-            "bestvideo[vcodec*=avc1][height<=1080]+bestaudio/best[height<=1080]"
-            "/best[height<=1080]"
-            "/best"
-        ),
+        format_string,
         "--merge-output-format",
         "mp4",
         "--download-sections",
