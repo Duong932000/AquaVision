@@ -15,7 +15,7 @@ echo "========================================"
 
 # parser user input
 read -rp "Best.pt model path, e,g: runs/detect/train/weights/best.pt: " MODEL
-read -rp "Data yaml path, e.g: data/aquavision.yaml: " DATA
+read -rp "Data yaml path, e.g: datasets/koi/datasets/Koi.v2-koi.dataset.298.images.13062026.yolo26/data.yaml: " DATA
 
 echo "========================================"
 echo " Validate Configuration"
