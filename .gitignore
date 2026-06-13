@@ -6,7 +6,7 @@ __pycache__/
 .venv/
 
 # Dataset
-datasets/*
+
 !datasets/koi/
 datasets/koi/*
 !datasets/koi/instruction.txt
