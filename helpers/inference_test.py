@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
+import cv2
+import time
+import yt_dlp
+import argparse
 from pathlib import Path
+from ultralytics import YOLO
 from datetime import datetime
 
-import argparse
-import time
-
-import cv2
-import yt_dlp
-
-from ultralytics import YOLO
 
 DEFAULT_MODEL = (
     "runs/detect/train/weights/best.pt"
@@ -33,107 +31,51 @@ def get_video_stream_url(url: str) -> str:
         "format": "best[ext=mp4]/best",
     }
 
-    with yt_dlp.YoutubeDL(
-        ydl_opts
-    ) as ydl:
-
-        info = ydl.extract_info(
-            url,
-            download=False,
-        )
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
 
     return info["url"]
-
 
 def is_image_file(source: str) -> bool:
 
     path = Path(source)
 
-    return (
-        path.exists()
-        and path.suffix.lower()
-        in IMAGE_EXTENSIONS
-    )
-
+    return (path.exists() and path.suffix.lower() in IMAGE_EXTENSIONS)
 
 def create_capture(source: str):
 
     local_file = Path(source)
 
     if local_file.exists():
-
-        print(
-            f"[INFO] Local source detected"
-        )
-
-        cap = cv2.VideoCapture(
-            str(local_file)
-        )
-
+        print(f"[INFO] Local source detected")
+        cap = cv2.VideoCapture(str(local_file))
     else:
-
-        print(
-            f"[INFO] YouTube URL detected"
-        )
-
-        stream_url = get_video_stream_url(
-            source
-        )
-
-        cap = cv2.VideoCapture(
-            stream_url
-        )
+        print(f"[INFO] YouTube URL detected")
+        stream_url = get_video_stream_url(source)
+        cap = cv2.VideoCapture(stream_url)
 
     if not cap.isOpened():
 
-        raise RuntimeError(
-            f"Cannot open source: {source}"
-        )
+        raise RuntimeError(f"Cannot open source: {source}")
 
     return cap
-
 
 def gui_available() -> bool:
 
     try:
-
-        cv2.namedWindow(
-            "test",
-            cv2.WINDOW_NORMAL,
-        )
-
-        cv2.destroyWindow(
-            "test"
-        )
-
+        cv2.namedWindow("test", cv2.WINDOW_NORMAL)
+        cv2.destroyWindow("test")
         return True
-
     except Exception:
-
         return False
 
+def run_image(model: YOLO, image_path: str, conf: float):
 
-def run_image(
-    model: YOLO,
-    image_path: str,
-    conf: float,
-):
-
-    image = cv2.imread(
-        image_path
-    )
-
+    image = cv2.imread(image_path)
     if image is None:
+        raise RuntimeError(f"Cannot load image: {image_path}")
 
-        raise RuntimeError(
-            f"Cannot load image: {image_path}"
-        )
-
-    results = model.predict(
-        image,
-        conf=conf,
-        verbose=False,
-    )
+    results = model.predict(image, conf=conf,verbose=False)
 
     annotated = image.copy()
 
@@ -142,137 +84,46 @@ def run_image(
     total_fish = 0
 
     if result.boxes is not None:
-
-        total_fish = len(
-            result.boxes
-        )
-
+        total_fish = len(result.boxes)
         for box in result.boxes:
+            x1, y1, x2, y2 = (box.xyxy[0].cpu().numpy().astype(int))
+            score = float(box.conf[0])
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(annotated, f"{score:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            x1, y1, x2, y2 = (
-                box.xyxy[0]
-                .cpu()
-                .numpy()
-                .astype(int)
-            )
+    cv2.putText(annotated, f"Fish: {total_fish}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2,)
 
-            score = float(
-                box.conf[0]
-            )
+    output_dir = Path("outputs/inference")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-            cv2.rectangle(
-                annotated,
-                (x1, y1),
-                (x2, y2),
-                (0, 255, 0),
-                2,
-            )
+    output_file = (output_dir / f"image_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
 
-            cv2.putText(
-                annotated,
-                f"{score:.2f}",
-                (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 0),
-                2,
-            )
+    cv2.imwrite(str(output_file), annotated)
 
-    cv2.putText(
-        annotated,
-        f"Fish: {total_fish}",
-        (20, 40),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1,
-        (0, 255, 0),
-        2,
-    )
-
-    output_dir = Path(
-        "outputs/inference"
-    )
-
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    output_file = (
-        output_dir
-        / f"image_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-    )
-
-    cv2.imwrite(
-        str(output_file),
-        annotated,
-    )
-
-    print(
-        f"[INFO] Saved: {output_file}"
-    )
+    print(f"[INFO] Saved: {output_file}")
 
     if gui_available():
-
-        cv2.imshow(
-            "AquaVision",
-            annotated,
-        )
-
+        cv2.imshow("AquaVision", annotated)
         cv2.waitKey(0)
-
         cv2.destroyAllWindows()
 
+def run_video(model: YOLO, source: str, conf: float, tracker: str):
 
-def run_video(
-    model: YOLO,
-    source: str,
-    conf: float,
-    tracker: str,
-):
+    cap = create_capture(source)
 
-    cap = create_capture(
-        source
-    )
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
-    width = int(
-        cap.get(
-            cv2.CAP_PROP_FRAME_WIDTH
-        )
-    )
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    height = int(
-        cap.get(
-            cv2.CAP_PROP_FRAME_HEIGHT
-        )
-    )
-
-    fps_input = cap.get(
-        cv2.CAP_PROP_FPS
-    )
+    fps_input = cap.get(cv2.CAP_PROP_FPS)
 
     if fps_input <= 0:
-
         fps_input = 25
 
-    output_dir = Path(
-        "outputs/inference"
-    )
+    output_dir = Path("outputs/inference")
 
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    output_file = (
-        output_dir
-        / (
-            "video_"
-            + datetime.now().strftime(
-                "%Y%m%d_%H%M%S"
-            )
-            + ".mp4"
-        )
-    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = (output_dir / ("video_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".mp4"))
 
     writer = cv2.VideoWriter(
         str(output_file),
@@ -285,134 +136,47 @@ def run_video(
 
     use_gui = gui_available()
 
-    print(
-        f"[INFO] GUI available: {use_gui}"
-    )
+    print(f"[INFO] GUI available: {use_gui}")
 
-    print(
-        f"[INFO] Saving output:"
-        f" {output_file}"
-    )
+    print(f"[INFO] Saving output: {output_file}")
 
     prev_time = time.time()
 
     while True:
-
         success, frame = cap.read()
-
         if not success:
             break
-
-        results = model.track(
-            frame,
-            persist=True,
-            tracker=tracker,
-            conf=conf,
-            verbose=False,
-        )
-
+        results = model.track(frame, persist=True, tracker=tracker, conf=conf, verbose=False)
         result = results[0]
-
         annotated = frame.copy()
-
         total_fish = 0
-
         if result.boxes is not None:
-
-            total_fish = len(
-                result.boxes
-            )
-
+            total_fish = len(result.boxes)
             for box in result.boxes:
-
-                x1, y1, x2, y2 = (
-                    box.xyxy[0]
-                    .cpu()
-                    .numpy()
-                    .astype(int)
-                )
-
-                score = float(
-                    box.conf[0]
-                )
-
+                x1, y1, x2, y2 = (box.xyxy[0].cpu().numpy().astype(int))
+                score = float(box.conf[0])
                 track_id = -1
-
-                if (
-                    hasattr(box, "id")
-                    and box.id is not None
-                ):
-                    track_id = int(
-                        box.id.item()
-                    )
-
-                cv2.rectangle(
-                    annotated,
-                    (x1, y1),
-                    (x2, y2),
-                    (0, 255, 0),
-                    2,
-                )
-
-                label = (
-                    f"ID:{track_id}"
-                    f" {score:.2f}"
-                )
-
-                cv2.putText(
-                    annotated,
-                    label,
-                    (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 0),
-                    2,
-                )
+                if (hasattr(box, "id") and box.id is not None):
+                    track_id = int(box.id.item())
+                cv2.rectangle(annotated,(x1, y1), (x2, y2), (0, 255, 0), 2)
+                label = (f"ID:{track_id} {score:.2f}")
+                cv2.putText(annotated, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         now = time.time()
 
-        fps = 1.0 / max(
-            now - prev_time,
-            1e-6,
-        )
+        fps = 1.0 / max(now - prev_time, 1e-6)
 
         prev_time = now
 
-        cv2.putText(
-            annotated,
-            f"Fish: {total_fish}",
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
+        cv2.putText(annotated, f"Fish: {total_fish}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        cv2.putText(
-            annotated,
-            f"FPS: {fps:.1f}",
-            (20, 80),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2,
-        )
+        cv2.putText(annotated, f"FPS: {fps:.1f}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        writer.write(
-            annotated
-        )
+        writer.write(annotated)
 
         if use_gui:
-
-            cv2.imshow(
-                "AquaVision",
-                annotated,
-            )
-
-            key = cv2.waitKey(
-                1
-            )
-
+            cv2.imshow("AquaVision", annotated)
+            key = cv2.waitKey(1)
             if key == 27:
                 break
 
@@ -422,71 +186,26 @@ def run_video(
 
     cv2.destroyAllWindows()
 
-    print()
-    print(
-        f"[INFO] Output saved:"
-    )
+    print(f"[INFO] Output saved: {output_file}")
     print(output_file)
-
 
 def main():
 
-    parser = argparse.ArgumentParser(
-        description=
-        "AquaVision Inference Test"
-    )
-
-    parser.add_argument(
-        "--source",
-        required=True,
-    )
-
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-    )
-
-    parser.add_argument(
-        "--tracker",
-        default=DEFAULT_TRACKER,
-    )
-
-    parser.add_argument(
-        "--conf",
-        type=float,
-        default=0.25,
-    )
-
+    parser = argparse.ArgumentParser(description="AquaVision Inference Test")
+    parser.add_argument("--source", required=True)
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--tracker", default=DEFAULT_TRACKER)
+    parser.add_argument("--conf",type=float, default=0.25)
     args = parser.parse_args()
 
-    print(
-        f"[INFO] Loading model:"
-        f" {args.model}"
-    )
+    print(f"[INFO] Loading model: {args.model}")
 
-    model = YOLO(
-        args.model
-    )
+    model = YOLO(args.model)
 
-    if is_image_file(
-        args.source
-    ):
-
-        run_image(
-            model,
-            args.source,
-            args.conf,
-        )
-
+    if is_image_file(args.source):
+        run_image(model, args.source, args.conf)
     else:
-
-        run_video(
-            model,
-            args.source,
-            args.conf,
-            args.tracker,
-        )
-
+        run_video(model, args.source, args.conf, args.tracker)
 
 if __name__ == "__main__":
     main()
