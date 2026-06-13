@@ -6,13 +6,13 @@ __pycache__/
 .venv/
 
 # Dataset
-
 !datasets/koi/
 datasets/koi/*
 !datasets/koi/instruction.txt
 koi.annotation.v1.yolov11/
 
 # Models
+*.pt
 models/*.pt
 models/*.onnx
 
