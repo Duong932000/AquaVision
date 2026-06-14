@@ -16,7 +16,7 @@ Object Tracking là quá trình theo dõi đối tượng khi nó di chuyển qu
 
 Trong nhiều hệ thống, quá trình này bắt đầu bằng Object Detection, giúp tìm kiếm và dán nhãn các đối tượng như người, phương tiện, hoặc biển báo giao thông trong mỗi khung hình. Sau đó, khi các đối tượng thay đổi vị trí, xuất hiện, biến mất, hoặc chồng lấp, hệ thống tracking sẽ liên kết các kết quả detection qua các khung hình để biết đối tượng nào là đối tượng và vị trí của từng đối tượng theo thời gian thực.
 
-![Object-Tracking](../../assets/object_tracking.png)
+![Object-Tracking](../../assets/doc_imgs/object_tracking.png)
 
 
 ## Classification
@@ -42,7 +42,7 @@ Bất cả loại tracking nào, đều dựa vào 3 điểm cốt lõi:
     + Hỗ trợ hàng loạt các tác vụ tị giác bao gồm: object detection, instance segmentation, pose estimation, object tracking. 
     + Bản thân các mô hình này không theo dõi đối tượng trên nhiều khung hình. Thay vào đó, Ultralytics Python Package giúp đơn giản hóa việc chạy và triển khai các mô hình Ultralytics YOLO, giúp việc tracking trở nên khả thi bằng cách kết hợp kết quả detection từng khung hình của YOLO với các thuật toán multi-object tracking chuyên dụng như BoT-SORT và ByteTrack.
 
-![Ultralytics](../../assets/ultralytics.png)
+![Ultralytics](../../assets/doc_imgs/ultralytics.png)
 
 
 - [2] OpenCV Trackers:
@@ -55,14 +55,14 @@ Bất cả loại tracking nào, đều dựa vào 3 điểm cốt lõi:
     + Điều này giúp nó tiếp tục theo dõi các đối tượng khó nhìn thấy trong thời gian ngắn, chẳng hạn như chúng bị che khuất một phần, ở xa hoặc di chuyển nhanh.
     + Điểm sáng là ByteTrack đã được tích hợp vào trong Ultralytics YOLO, nên việc kích hoạt qua Ultralytic Python Package rất dễ dàng.
 
-![ByteTrack Algorithm](../../assets/ByteTrack_algorithm.png)
+![ByteTrack Algorithm](../../assets/doc_imgs/ByteTrack_algorithm.png)
 
 
 - [4] DeepSORT
     + DeepSORT là viết tắt của Deep simple Online and Real-time Tracking, tương tự như ByteTrack, SORT tuân theo cách tiếp cận tracking-by-detection, tuy nhiên DeepSORT dựa vào Kalman filter, một mô hình toán học ước tính vị trí tương lai của đối tượng dựa treo chuyển động trong quá khứ, để dự đoán hướng di chuyển tiếp theo của từng đối tượng.
     + Tuy nhiên, hiện nay DeepSORT được coi như một baseline cổ điển, và các phương pháp tracking mới hơn đạt hiệu suất tốt hơn.
 
-![DeepSORT Algorithm](../../assets/DeepSORT_algorithm.png)
+![DeepSORT Algorithm](../../assets/doc_imgs/DeepSORT_algorithm.png)
 
 
 - [5] Norfair
@@ -76,12 +76,12 @@ Bất cả loại tracking nào, đều dựa vào 3 điểm cốt lõi:
 - [7] FairMOT
     + FairMOT là một framework multi-object traking đựoc thiết kế để theo dõi nhiều đối tượng cùng lúc. Không giống như các pipeline tracking-by-detection truyền thống chạy detection trước rồi mới liên kết các đối tượng qua khung hình như một bứoc riêng biệt, FairMOT học việc detection và re-indetification cùng lúc trong một mạng duy nhất.
 
-![FairMOT Algorithm](../../assets/FairMOT_algorithm.png)
+![FairMOT Algorithm](../../assets/doc_imgs/FairMOT_algorithm.png)
 
 
 - [8] SlamMask: Là một phương pháp single-object tracking đi xa hơn nhiều trình theo dõi khác bằng cách tạo ra một segmentation mask cùng bbox. Không chỉ dừng lại ở việc vẽ khung chữ nhật, nó cùng phác thảo hình dạng của đối tượng theo dõi ở mức pixel.
 
-![SlamMask](../../assets/SlamMask.png)
+![SlamMask](../../assets/doc_imgs/SlamMask.png)
 
 
 ## Key factor in choosing an Object Tracking Tools
