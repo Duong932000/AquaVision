@@ -9,6 +9,9 @@ cd "$REPO_ROOT"
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
+export ROOT_DIR="$REPO_ROOT"
+echo "ROOT_DIR=$ROOT_DIR"
+
 read -rp "Source (image/video/youtube): " SOURCE
 read -rp "Model [runs/detect/train/weights/best.pt]: " MODEL
 

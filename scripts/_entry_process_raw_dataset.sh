@@ -9,6 +9,9 @@ cd "$REPO_ROOT"
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
+export ROOT_DIR="$REPO_ROOT"
+echo "ROOT_DIR=$ROOT_DIR"
+
 read -rp "Fish Type [koi]: " FISH_TYPE
 read -rp "Frames per Video [15]: " FRAMES_PER_VIDEO
 

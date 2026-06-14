@@ -9,6 +9,9 @@ cd "$REPO_ROOT"
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
+export ROOT_DIR="$REPO_ROOT"
+echo "ROOT_DIR=$ROOT_DIR"
+
 echo "========================================"
 echo " AquaVision YOLO26 Trainer"
 echo "========================================"

@@ -9,6 +9,9 @@ cd "$REPO_ROOT"
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
+export ROOT_DIR="$REPO_ROOT"
+echo "ROOT_DIR=$ROOT_DIR"
+
 read -rp "YouTube URL: " URL
 read -rp "Fish type (tilapia, catfish, etc.): " FISH_TYPE
 read -rp "Start time, e.g: 01:45 " START_TIME
