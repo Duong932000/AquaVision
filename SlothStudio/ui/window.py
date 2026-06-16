@@ -1,12 +1,14 @@
 
 import sys
-import cv2
-from config.assets import asset_resources
 import customtkinter
 from PIL import Image
+from pathlib import Path
+from tkinter import filedialog
 from CTkMessagebox import CTkMessagebox
-from tkinterdnd2 import DND_FILES, TkinterDnD
+from tkinterdnd2 import TkinterDnD, DND_ALL, DND_FILES
 
+# internal modules
+from config.assets import asset_resources
 
 # custom appearance of UI
 customtkinter.set_appearance_mode("dark")
@@ -14,7 +16,7 @@ customtkinter.set_default_color_theme("green")
 
 
 class InferenceProgressTextbox(customtkinter.CTkFrame):
-    def _init_(self, master, textbox_width=300, textbox_height=150, **kwargs):
+    def __init__(self, master, textbox_width=300, textbox_height=150, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         
         self.textbox \
@@ -39,7 +41,16 @@ class InferenceProgressTextbox(customtkinter.CTkFrame):
         self.textbox.delete("1.0", "end")
         self.textbox.configure(state="disabled")
 
-class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
+class DragnDropSources(customtkinter.CTk, TkinterDnD.DnDWrapper):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # load tkdnd package
+        self.TkdndVersion = TkinterDnD._require(self)
+        print(f"[INFO] tkdnd loaded: {self.TkdndVersion}")
+
+class MainWindow(DragnDropSources):
 
     width_dashboard = 1300
     height_dashboard = 800
@@ -47,17 +58,19 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.source_var = customtkinter.StringVar(value="")
+
         # init UI
-        self.GUI_InitSetupResources_Displayer()
+        self.GUI_InitSetupResources_Controller()
 
         # setup widgets for UI
-        self.GUI_PanelSetupResources_Displayer()
+        self.GUI_PanelSetupResources_Controller()
 
-        # self.GUI_CoreFunctionality_Displayer()
+        self.GUI_CoreFunctionality_Controller()
 
     # ------------------- INIT SETUP RESOURCE ------------------- #
     # ------------------------------------------------------------#
-    def GUI_InitSetupResources_Displayer(self):
+    def GUI_InitSetupResources_Controller(self):
 
         # config for common resources of UI
         self.CommonSetupResources()
@@ -109,7 +122,7 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
 
     # ------------------- PANEL SETUP RESOURCE ------------------- #
     # -------------------------------------------------------------#
-    def GUI_PanelSetupResources_Displayer(self):
+    def GUI_PanelSetupResources_Controller(self):
 
         # Menu Panel
         self.MenuPanel_Adapter()
@@ -239,53 +252,54 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
         self.InferenceControl_WidgetConfigure()
 
     def InferenceVideo_WidgetConfigure(self):
-        
+
         # Video panel label
         self.video_panel_label \
             = customtkinter.CTkLabel(self.inference_video_frame,
-                                     text="✓ Video Panel",
+                                     text="✓ Display Panel",
                                      font=customtkinter.CTkFont(size=18, weight="bold"))
         self.video_panel_label.pack(anchor="w", padx=5, pady=(10, 5))
 
         # drop frame
-        self.inference_drop_frame \
-            = customtkinter.CTkFrame(self.inference_video_frame, corner_radius=15)
-        self.inference_drop_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # drop icon
-        self.drop_icon \
-            = customtkinter.CTkButton(self.inference_drop_frame,
-                                      text="",
-                                      image=self.dragdrop_img,
-                                      corner_radius=5,
-                                      height=120,
-                                      anchor="w",
-                                      state="disabled",
-                                      fg_color="transparent",
-                                      text_color=("gray10", "gray90"),
-                                      hover_color=("gray70", "gray30"),)
-        self.drop_icon.pack(anchor="center", padx=100)
-
+        self.drop_zone_entry \
+            = customtkinter.CTkEntry(self.inference_video_frame,
+                                     height=240,
+                                     placeholder_text="Drag and drop source files here ...",
+                                     corner_radius=15,
+                                     border_width=2)
+        self.drop_zone_entry.pack(fill="x", padx=40, pady=120)
+        # # self.drop_zone_frame.pack_propagate(False)
+        self.drop_zone_entry.drop_target_register(DND_ALL)
+        self.drop_zone_entry.dnd_bind("<<Drop>>", self.SourcesDrop_Event)
+        self.drop_zone_entry.dnd_bind("<<DropEnter>>", self.DropEnter_Event)
+        self.drop_zone_entry.dnd_bind("<<DropLeave>>", self.DropLeave_Event)
+    
         # drop label
-        self.drop_label \
-            = customtkinter.CTkLabel(self.inference_drop_frame,
-                                     text="Drag & Drop Image / Video Here",
-                                     font=customtkinter.CTkFont(size=24, weight="bold"))
-        self.drop_label.pack()
+        # self.drop_zone_label \
+        #     = customtkinter.CTkLabel(self.drop_zone_frame,
+        #                              text="Drag & Drop Image / Video Here\n\nOr",
+        #                              font=customtkinter.CTkFont(size=32, weight="bold"))
+        # self.drop_zone_label.place(relx=0.5, rely=0.4, anchor="center")
+        # self.drop_zone_label.drop_target_register(DND_ALL)
+        # self.drop_zone_label.dnd_bind("<<Drop>>", self.SourcesDrop_Event)
+        # self.drop_zone_label.dnd_bind("<<DropEnter>>", self.DropEnter_Event)
+        # self.drop_zone_label.dnd_bind("<<DropLeave>>", self.DropLeave_Event)
 
-        self.youtube_entry \
-            = customtkinter.CTkEntry(self.inference_drop_frame,
-                                    width=500,
-                                    height=40,
-                                    placeholder_text=
-                                    "https://www.youtube.com/watch?v=...")
-        self.youtube_entry.pack(pady=(30, 10))
-
-        self.load_source_button \
-            = customtkinter.CTkButton(self.inference_drop_frame,
+        self.browse_files_button \
+            = customtkinter.CTkButton(self.inference_video_frame,
                                       text="Browse Files",
                                       command=self.BrowseFiles_Event)
-        self.load_source_button.pack(pady=10)
+        self.browse_files_button.pack(pady=(30, 10), anchor="center")
+
+        self.youtube_entry \
+            = customtkinter.CTkEntry(self.inference_video_frame,
+                                    width=600,
+                                    height=40,
+                                    placeholder_text="https://www.youtube.com/watch?v=...")
+        self.youtube_entry.pack(pady=(30, 10))
+
+        self.youtube_entry.bind("<Return>", self.LoadYoutubeURL_Event)
+
 
     def InferenceLog_WidgetConfigure(self):
         
@@ -341,10 +355,11 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
         # Source entry
         self.source_entry \
             = customtkinter.CTkEntry(self.control_scroll_frame,
+                                     textvariable=self.source_var,
                                      height=35,
                                      placeholder_text="Enter source path here (e.g: video.mp4 / image.jpg / youtube url)")
         self.source_entry.pack(fill="x", padx=10, pady=10)
-
+        self.source_entry.bind("<Return>", self.SourceEntryChanged_Event)
 
         #-------------------------------------------------------------------------------#
         #                                  MODEL CONFIGURE                              #
@@ -385,8 +400,7 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
             = customtkinter.CTkComboBox(self.control_scroll_frame,
                                         values=[
                                             "ByteTrack",
-                                            "BoT-SORT",
-                                            "DeepSORT"
+                                            "BoT-SORT"
                                         ])
         self.tracker_combobox.set("ByteTrack")
         self.tracker_combobox.pack(fill="x", padx=10, pady=10)
@@ -541,9 +555,88 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
 
         self.FrameSelection("Dataset")
 
+    def SourcesDrop_Event(self, event):
+
+        filepath = event.data.strip()
+
+        if filepath.startswith("{"):
+            filepath = filepath[1:-1]
+
+        filepath = filepath.strip()
+
+        print("=" * 50)
+        print("DROP SUCCESS")
+        print(filepath)
+        print("=" * 50)
+
+        self.source_var.set(filepath)
+
+        self.AppendInferenceLog_Event(
+            f"[INFO] Source loaded: {filepath}"
+        )
+
+        # self.drop_zone_label.configure(
+        #     text=f"Loaded:\n{Path(filepath).name}"
+        # )
+
+    def UpdateSourceFiles_Event(self, filepath):
+
+        self.source_var.set(filepath)
+        print(f"[DEBUG] Source var: {self.source_var}")
+    
+        self.AppendInferenceLog_Event(
+            f"[INFO] Source loaded: {filepath}"
+        )
+
+        filename = Path(filepath).name
+
+
+        self.update_idletasks()
+
+
+    def AppendInferenceLog_Event(self, message):
+
+        self.inference_log_textbox.append(f"{message}\n")
+
+    def LoadYoutubeURL_Event(self, event=None):
+
+        url = self.youtube_entry.get().strip()
+        if not url:
+            return
+        
+        self.UpdateSourceFiles_Event(url)
+
+    def SourceEntryChanged_Event(self, event=None):
+
+        source = self.source_entry.get().strip()
+        if not source:
+            return
+
+        self.AppendInferenceLog_Event(f"[SOURCE] {source}")
+
+        self.AppendInferenceLog_Event("[INFO] Source manually updated")
+
     def BrowseFiles_Event(self):
 
-        pass
+        filepath = filedialog.askopenfilename(
+            title="Select source file",
+            filetypes=[
+                (
+                    "Media Files",
+                    "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv"
+                ),
+                (
+                    "All Files",
+                    "*.*"
+                )
+            ]
+        )
+
+        if not filepath:
+            return
+
+        self.UpdateSourceFiles_Event(filepath)
+
 
     def ConfidenceSlider_Event(self, value):
 
@@ -574,5 +667,24 @@ class MainWindow(TkinterDnD.DnDWrapper, customtkinter.CTk):
 
     def ClearInferenceLog_Event(self):
 
-        pass
+        self.inference_log_textbox.clear()
 
+        self.AppendInferenceLog_Event("[INFO] Log cleared")
+
+    def DropEnter_Event(self, event):
+        print("drop enter")
+        # self.drop_zone_entry.configure(border_width=4, border_color="#00AA55")
+
+        return event.action
+
+    def DropLeave_Event(self, event):
+        print("drop leave")
+        # self.drop_zone_entry.configure(border_width=2, border_color=("gray50", "gray50"))
+
+        return event.action
+
+    # ------------------- FUNCTIONALITY SETUP RESOURCE ------------------- #
+    # ---------------------------------------------------------------------#
+    def GUI_CoreFunctionality_Controller(self):
+
+        pass
