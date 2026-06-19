@@ -1,4 +1,4 @@
-
+import json
 import sys
 import customtkinter
 from PIL import Image
@@ -6,9 +6,14 @@ from datetime import datetime
 from tkinter import filedialog
 from CTkMessagebox import CTkMessagebox
 from tkinterdnd2 import TkinterDnD, DND_ALL
+from PIL import Image
+from PIL import ImageTk
+
+import cv2
 
 # internal modules
 from config.assets import asset_resources
+from processor.inference_processor import InferenceProcessor
 
 # custom appearance of UI
 customtkinter.set_appearance_mode("dark")
@@ -28,7 +33,7 @@ class InferenceLogTextbox(customtkinter.CTkFrame):
                                        font=customtkinter.CTkFont(size=13))
         self.textbox.pack(fill="both", expand=True)
         self.textbox.pack(fill="both", expand=True, padx=10, pady=(10, 10))
-        self.textbox.tag_config("INFO", foreground="#90EE90")       # light green
+        self.textbox.tag_config("INFO", foreground="#87CEFA")       # light blue
         self.textbox.tag_config("WARNING", foreground="#FFD700")    # light yellow
         self.textbox.tag_config("ERROR", foreground="#FF6B6B")      # light red
         self.textbox.configure(state="disabled")
@@ -71,12 +76,18 @@ class MainWindow(DragnDropSources):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # inference variable
-        self.local_sourcefiles = []
-        self.youtube_urls = []
-        self.local_file_checkboxes = []
+        # inference display variable
         self.inference_config = {}
+        self.selected_local_sources = []
+        self.selected_youtube_url = []
+        self.local_file_checkboxes = []
         self.source_type_var = customtkinter.StringVar(value="Youtube URL")
+
+        # inference control variable
+        self.model_selection_var = customtkinter.StringVar(value="Trained")
+        self.trained_model_var = customtkinter.StringVar(value="")
+        self.pretrained_version_var = customtkinter.StringVar(value="YOLO26")
+        self.pretrained_size_var = customtkinter.StringVar(value="n")
 
         # init UI
         self.GUI_InitSetupResources_Controller()
@@ -295,7 +306,7 @@ class MainWindow(DragnDropSources):
         self.InferenceControl_WidgetConfigure()
 
     def InferenceDisplay_WidgetConfigure(self):
-        
+
         # ----------------------------------------------------------------------------#
         # Common frame for display inference
         # ----------------------------------------------------------------------------#
@@ -353,7 +364,7 @@ class MainWindow(DragnDropSources):
                                       width=50,
                                       height=25,
                                       text="Browse Files",
-                                      command=self.BrowseLocalFiles_Event,
+                                      command=self.BrowseLocalSourceFiles_Event,
                                       font=customtkinter.CTkFont(size=28))
 
         self.source_files_list_label \
@@ -427,8 +438,8 @@ class MainWindow(DragnDropSources):
         if filepath.startswith("{"):
             filepath = filepath[1:-1]
 
-        if filepath not in self.local_sourcefiles:
-            self.local_sourcefiles.append(filepath)
+        if filepath not in self.selected_local_sources:
+            self.selected_local_sources.append(filepath)
             self.AppendInferenceLog_Event("INFO", f"Source added: {filepath}")
 
         self.ShowLocalSourceFiles_Event()
@@ -445,7 +456,7 @@ class MainWindow(DragnDropSources):
 
         return event.action
 
-    def BrowseLocalFiles_Event(self):
+    def BrowseLocalSourceFiles_Event(self):
 
         filepaths = filedialog.askopenfilenames(
             title="Select Source Files",
@@ -461,8 +472,8 @@ class MainWindow(DragnDropSources):
             return
 
         for filepath in filepaths:
-            if filepath not in self.local_sourcefiles:
-                self.local_sourcefiles.append(filepath)
+            if filepath not in self.selected_local_sources:
+                self.selected_local_sources.append(filepath)
 
         self.ShowLocalSourceFiles_Event()
         self.AppendInferenceLog_Event("INFO", f"Added {len(filepaths)} source files")
@@ -484,7 +495,7 @@ class MainWindow(DragnDropSources):
         select_all_checkbox.pack(anchor="w", padx=10, pady=(10, 20))
 
         # individual file checkboxes
-        for filepath in self.local_sourcefiles:
+        for filepath in self.selected_local_sources:
             var = customtkinter.BooleanVar(value=True)
             checkbox \
                 = customtkinter.CTkCheckBox(self.source_list_checkbox, text=filepath, variable=var)
@@ -512,12 +523,17 @@ class MainWindow(DragnDropSources):
             if var.get():
                 selected_files.append(filepath)
 
-        self.inference_config = {
-            "source_type": "local",
-            "sources": selected_files
-        }
+        if not selected_files:
+            self.AppendInferenceLog_Event("ERROR", "No source files selected!")
+            return
+        
+        self.selected_local_sources = selected_files
+
+        config = self.BuildInferenceConfig_Event()
 
         self.AppendInferenceLog_Event("INFO", f"Local source: {len(selected_files)} files submitted")
+
+        print(json.dumps(config, indent=4))
 
     def SubmitYoutubeSources_Event(self):
 
@@ -526,14 +542,17 @@ class MainWindow(DragnDropSources):
             self.AppendInferenceLog_Event("ERROR", "Please enter a youtube URL")
             return
 
-        self.inference_config = {
-            "source_type": "youtube",
-            "sources": [
-                url
-            ]
-        }
+        if not url:
+            self.AppendInferenceLog_Event("ERROR", "Please enter a Youtube URL")
+            return
+        
+        self.selected_youtube_url = url
+
+        config = self.BuildInferenceConfig_Event()
 
         self.AppendInferenceLog_Event("INFO", f"Youtube URL selected: {url}")
+
+        print(json.dumps(config, indent=4))
 
     def InferenceLog_WidgetConfigure(self):
         
@@ -588,29 +607,75 @@ class MainWindow(DragnDropSources):
         #                                  MODEL CONFIGURE                              #
         #-------------------------------------------------------------------------------#
         # Model label
-        self.model_label \
+        self.model_selection_label \
             = customtkinter.CTkLabel(self.control_scroll_frame,
-                                     text="✓ Model:",
+                                     text="✓ Model Selection:",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
-        self.model_label.pack(anchor="w", padx=10, pady=(15, 5))
+        self.model_selection_label.pack(anchor="w", padx=10, pady=(15, 5))
+ 
+        # model frame
+        self.model_selection_frame \
+            = customtkinter.CTkFrame(self.control_scroll_frame, fg_color="transparent")
+        self.model_selection_frame.pack(fill="x", padx=10, pady=(0, 10))
 
-        # Model entry
-        self.model_entry \
-            = customtkinter.CTkEntry(self.control_scroll_frame,
-                                     height=35,
-                                     placeholder_text=
-                                     "e.g: runs/detect/train/weights/best.pt")
-        self.model_entry.pack(fill="x", padx=10, pady=10)
+        # Trained model radio button
+        self.trained_radio \
+            = customtkinter.CTkRadioButton(self.model_selection_frame,
+                                           text="Trained Model",
+                                           variable=self.model_selection_var,
+                                           value="Trained",
+                                           command=self.ModelSourceChanged_Event)
+        self.trained_radio.pack(anchor="w", padx=10, pady=(5, 5))
+
+        # Pre-Trained model radio button
+        self.pretrained_radio \
+            = customtkinter.CTkRadioButton(self.model_selection_frame,
+                                           text="Pretrained Model",
+                                           variable=self.model_selection_var,
+                                           value="Pretrained",
+                                           command=self.ModelSourceChanged_Event)
+        self.pretrained_radio.pack(anchor="w", padx=10, pady=(5, 10))
+
+        # trained model frame
+        self.trained_model_frame = customtkinter.CTkFrame(self.model_selection_frame, fg_color="transparent")
+        self.trained_model_frame.pack(fill="x", pady=5)
+
+        # browse trained model button
+        self.browse_model_button \
+            = customtkinter.CTkButton(self.trained_model_frame,
+                                      width=40,
+                                      height=30,
+                                      text="Browse Model Path",
+                                      command=self.BrowseModel_Event,
+                                      font=customtkinter.CTkFont(size=14))
+        self.browse_model_button.pack(anchor="w", padx=5, pady=10)
+
+        # pretrained model frame
+        self.pretrained_model_frame \
+            = customtkinter.CTkFrame(self.model_selection_frame, fg_color="transparent")
+
+        # model version optionmenu
+        self.pretrained_model_version_optionmenu \
+            = customtkinter.CTkOptionMenu(self.pretrained_model_frame,
+                                          variable=self.pretrained_version_var,
+                                          values=["YOLO26", "YOLO11", "YOLOv8"])
+        self.pretrained_model_version_optionmenu.pack(fill="x", pady=(0, 10))
+
+        self.pretrained_model_type_optionmenu \
+            = customtkinter.CTkOptionMenu(self.pretrained_model_frame,
+                                         variable=self.pretrained_size_var,
+                                         values=["n", "s", "m", "l", "x"])
+        self.pretrained_model_type_optionmenu.pack(fill="x")
 
         #-------------------------------------------------------------------------------#
         #                                TRACKER CONFIGURE                              #
         #-------------------------------------------------------------------------------#
         # Tracking label
-        self.tracking_label \
+        self.tracker_label \
             = customtkinter.CTkLabel(self.control_scroll_frame,
-                                     text="✓ Tracking:",
+                                     text="✓ MOT Tracker:",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
-        self.tracking_label.pack(anchor="w", padx=10, pady=(15, 5))
+        self.tracker_label.pack(anchor="w", padx=10, pady=(15, 5))
 
         # Tracking checkbox
         self.enable_tracking_checkbox \
@@ -720,6 +785,7 @@ class MainWindow(DragnDropSources):
         self.start_button \
             = customtkinter.CTkButton(self.control_scroll_frame,
                                       text="Start Inference",
+                                      command=self.StartInference_Event,
                                       height=40,
                                       font=customtkinter.CTkFont(size=14))
         self.start_button.pack(fill="x", padx=10, pady=(25, 10))
@@ -728,10 +794,88 @@ class MainWindow(DragnDropSources):
         self.stop_button \
             = customtkinter.CTkButton(self.control_scroll_frame,
                                       text="Stop Inference",
+                                      command=self.StopInference_Event,
                                       height=40,
                                       fg_color="darkred",
                                       font=customtkinter.CTkFont(size=14))
         self.stop_button.pack(fill="x", padx=10, pady=(5, 20))
+
+        self.ModelSourceChanged_Event()
+
+    def BuildInferenceConfig_Event(self):
+
+        config = {}
+
+        # source process
+        source_type = self.source_type_var.get()
+        if source_type == "Local Files":
+            config["source_type"] = "local"
+            config["sources"] = self.selected_local_sources
+        else:
+            config["source_type"] = "youtube"
+            if self.selected_youtube_url:
+                config["sources"] = [self.selected_youtube_url]
+            else:
+                config["sources"] = []
+        
+        # model path process
+        config["model"] = {
+            "model_selection": self.model_selection_var.get()
+        }
+        
+        if self.model_selection_var.get() == "Trained":
+            config["model"]["path"] = self.trained_model_var.get()
+        else:
+            config["model"]["version"] = self.pretrained_version_var.get()
+            config["model"]["size"] = self.pretrained_size_var.get()
+
+        # tracker process
+        config["tracking"] = {
+            "enabled": bool(self.enable_tracking_checkbox.get()),
+            "tracker": self.tracker_combobox.get()
+        }
+
+        # detection process
+        config["detection"] = {
+            "confidence": round(self.confidence_slider.get(), 2),
+            "iou": round(self.iou_slider.get(), 2)
+        }
+
+        # output process
+        config["output"] = {
+            "save_video": bool(self.save_video_checkbox.get()),
+            "save_frames": bool(self.save_frames_checkbox.get())
+        }
+
+        # runtime process
+        config["runtime"] = {
+            "device": self.device_combobox.get()
+        }
+
+        self.inference_config = config
+
+        return config
+
+    def ModelSourceChanged_Event(self):
+
+        if self.model_selection_var.get() == "Trained":
+            self.pretrained_model_frame.pack_forget()
+            self.trained_model_frame.pack(fill="x", pady=5)
+        else:
+            self.trained_model_frame.pack_forget()
+            self.pretrained_model_frame.pack(fill="x", pady=5)
+
+    def BrowseModel_Event(self):
+
+        filepath = filedialog.askopenfilename(title="Select YOLO Model",
+                                              filetypes=[("PyTorch Model", "*.pt")])
+
+        if not filepath:
+            return
+
+        self.trained_model_var.set(filepath)
+
+        self.AppendInferenceLog_Event("INFO", f"Model selected: {filepath}")
 
     def ConfidenceSlider_Event(self, value):
 
@@ -740,6 +884,57 @@ class MainWindow(DragnDropSources):
     def IoUSlider_Event(self, value):
 
         self.iou_value_label.configure(text=f"{value:.2f}")
+
+    def StartInference_Event(self):
+
+        config = self.BuildInferenceConfig_Event()
+
+        if not config["sources"]:
+
+            self.AppendInferenceLog_Event(
+                "ERROR",
+                "No source selected"
+            )
+            return
+
+        self.processor = InferenceProcessor(
+            config=config,
+            frame_callback=self.UpdateInferenceFrame_Event,
+            log_callback=self.AppendInferenceLog_Event
+        )
+
+        self.processor.start()
+
+    def StopInference_Event(self):
+
+        if hasattr(self, "processor"):
+
+            self.processor.stop()
+
+    def UpdateInferenceFrame_Event(self, frame):
+
+        rgb = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2RGB
+        )
+
+        image = Image.fromarray(rgb)
+
+        image = image.resize(
+            (
+                self.video_display_label.winfo_width(),
+                self.video_display_label.winfo_height()
+            )
+        )
+
+        photo = ImageTk.PhotoImage(image)
+
+        self.video_display_label.configure(
+            image=photo,
+            text=""
+        )
+
+        self.video_display_label.image = photo
 
     # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
