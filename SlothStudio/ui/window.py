@@ -2,7 +2,7 @@
 import sys
 import customtkinter
 from PIL import Image
-from pathlib import Path
+from datetime import datetime
 from tkinter import filedialog
 from CTkMessagebox import CTkMessagebox
 from tkinterdnd2 import TkinterDnD, DND_ALL
@@ -16,7 +16,7 @@ customtkinter.set_default_color_theme("green")
 
 
 class InferenceLogTextbox(customtkinter.CTkFrame):
-    def __init__(self, master, textbox_width=300, textbox_height=150, **kwargs):
+    def __init__(self, master, textbox_width=310, textbox_height=220, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         
         self.textbox \
@@ -27,11 +27,26 @@ class InferenceLogTextbox(customtkinter.CTkFrame):
                                        corner_radius=5,
                                        font=customtkinter.CTkFont(size=13))
         self.textbox.pack(fill="both", expand=True)
+        self.textbox.pack(fill="both", expand=True, padx=10, pady=(10, 10))
+        self.textbox.tag_config("INFO", foreground="#90EE90")       # light green
+        self.textbox.tag_config("WARNING", foreground="#FFD700")    # light yellow
+        self.textbox.tag_config("ERROR", foreground="#FF6B6B")      # light red
+        self.textbox.configure(state="disabled")
+
+    def append_log(self, log_type, message):
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.textbox.configure(state="normal")
+        self.textbox.insert("end", f"[{log_type}] ", log_type)
+        self.textbox.insert("end", f"[{timestamp}] ")
+        self.textbox.insert("end", f"{message}\n")
+        self.textbox.see("end")
         self.textbox.configure(state="disabled")
 
     def append(self, message):
+
         self.textbox.configure(state="normal")
-        self.textbox.insert("end", f"{message}")
+        self.textbox.insert("end", f"{message}\n")
         self.textbox.see("end")
         self.textbox.configure(state="disabled")
 
@@ -69,6 +84,7 @@ class MainWindow(DragnDropSources):
         # setup widgets for UI
         self.GUI_PanelSetupResources_Controller()
 
+        # start core functionality
         self.GUI_CoreFunctionality_Controller()
 
     # ------------------- INIT SETUP RESOURCE ------------------- #
@@ -122,6 +138,24 @@ class MainWindow(DragnDropSources):
         self.dragdrop_img = customtkinter.CTkImage(
             Image.open(asset_resources("dragdrop.png")), size=(50, 50))
 
+    def OnClosingApp_Event(self):
+
+        msg_ExitSystem \
+            = CTkMessagebox(master=self,
+                            title="Exit",
+                            message="Do you want to exit the FaceID Enrollment System",
+                            icon="question",
+                            option_1="Cancel",
+                            option_2="Exit")
+        if msg_ExitSystem.get() == "Exit":
+            if hasattr(self, "face_processor"):
+                self.face_processor.stop()
+
+            if hasattr(self, "camera_stream"):
+                self.camera_stream.stop()
+
+            self.destroy()
+            sys.exit()
 
     # ------------------- PANEL SETUP RESOURCE ------------------- #
     # -------------------------------------------------------------#
@@ -143,8 +177,9 @@ class MainWindow(DragnDropSources):
         self.DatasetPanel_Adapter()
 
         # frame selection
-        self.FrameSelection("Inference")
+        self.FrameSelection_Adapter("Inference")
     
+    # MENU PANEL SETUP --------------------------------------------#
     def MenuPanel_Adapter(self):
 
         # logo
@@ -204,6 +239,7 @@ class MainWindow(DragnDropSources):
         # Spacer
         self.menu_panel.grid_rowconfigure(4, weight=1)
 
+    # DISPLAY PANEL SETUP -----------------------------------------#
     def DisplayPanel_Adapter(self):
 
         # inference frame
@@ -222,6 +258,7 @@ class MainWindow(DragnDropSources):
             frame.grid_rowconfigure(0, weight=1)
             frame.grid_columnconfigure(0, weight=1)
 
+    # INFERENCE PANEL SETUP ---------------------------------------#
     def InferencePanel_Adapter(self):
 
         # setup rate of inference_frame: 6-2-2
@@ -358,6 +395,146 @@ class MainWindow(DragnDropSources):
 
         self.SourceTypeChanged_Event(self.source_type_var.get())
 
+    def SourceTypeChanged_Event(self, source_type):
+
+        # Hide all widgets first
+        self.upload_files_label.pack_forget()
+        self.drop_zone_entry.pack_forget()
+        self.or_label.pack_forget()
+        self.browse_files_button.pack_forget()
+        self.youtube_label.pack_forget()
+        self.youtube_entry.pack_forget()
+        self.submit_youtube_url_button.pack_forget()
+        self.source_files_list_label.pack_forget()
+        self.source_list_checkbox.pack_forget()
+
+        if source_type == "Youtube URL":
+            self.youtube_label.pack(anchor="center", padx=5, pady=(50, 10))
+            self.youtube_entry.pack(anchor="center", pady=(10, 10))
+            self.submit_youtube_url_button.pack(anchor="center", pady=(50, 10))
+        elif source_type == "Local Files":
+            self.upload_files_label.pack(anchor="center", padx=5, pady=(50, 10))
+            self.drop_zone_entry.pack(anchor="center", pady=(10, 5))
+            self.or_label.pack(anchor="center", pady=(5, 5))
+            self.browse_files_button.pack(anchor="center", pady=(5, 10))
+            self.source_files_list_label.pack(anchor="center", pady=(50, 10))
+            self.source_list_checkbox.pack(anchor="center", padx=5, pady=10)
+
+    def SourcesDrop_Event(self, event):
+
+        filepath = event.data.strip()
+
+        if filepath.startswith("{"):
+            filepath = filepath[1:-1]
+
+        if filepath not in self.local_sourcefiles:
+            self.local_sourcefiles.append(filepath)
+            self.AppendInferenceLog_Event("INFO", f"Source added: {filepath}")
+
+        self.ShowLocalSourceFiles_Event()
+
+    def DropEnter_Event(self, event):
+
+        self.drop_zone_entry.configure(border_width=2, border_color="#00AA55")
+
+        return event.action
+
+    def DropLeave_Event(self, event):
+
+        self.drop_zone_entry.configure(border_width=1, border_color=("gray50", "gray50"))
+
+        return event.action
+
+    def BrowseLocalFiles_Event(self):
+
+        filepaths = filedialog.askopenfilenames(
+            title="Select Source Files",
+            filetypes=[
+                (
+                    "Media Files",
+                    "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv"
+                )
+            ]
+        )
+
+        if not filepaths:
+            return
+
+        for filepath in filepaths:
+            if filepath not in self.local_sourcefiles:
+                self.local_sourcefiles.append(filepath)
+
+        self.ShowLocalSourceFiles_Event()
+        self.AppendInferenceLog_Event("INFO", f"Added {len(filepaths)} source files")
+
+    def ShowLocalSourceFiles_Event(self):
+
+        for widget in self.source_list_checkbox.winfo_children():
+            widget.destroy()
+
+        self.local_file_checkboxes.clear()
+
+        # select all show
+        self.select_all_var = customtkinter.BooleanVar(value=True)
+        select_all_checkbox \
+            = customtkinter.CTkCheckBox(self.source_list_checkbox,
+                                        text="Select All",
+                                        variable=self.select_all_var,
+                                        command=self.SelectAllSources_Event)
+        select_all_checkbox.pack(anchor="w", padx=10, pady=(10, 20))
+
+        # individual file checkboxes
+        for filepath in self.local_sourcefiles:
+            var = customtkinter.BooleanVar(value=True)
+            checkbox \
+                = customtkinter.CTkCheckBox(self.source_list_checkbox, text=filepath, variable=var)
+            checkbox.pack(anchor="w", padx=25, pady=5)
+            self.local_file_checkboxes.append((filepath, var))
+
+        submit_button \
+            = customtkinter.CTkButton(self.source_list_checkbox,
+                                      text="Submit Sources",
+                                      command=self.SubmitLocalSources_Event)
+        submit_button.pack(anchor="center", pady=25)
+
+    def SelectAllSources_Event(self):
+
+        state = self.select_all_var.get()
+
+        for _, var in self.local_file_checkboxes:
+            var.set(state)
+
+    def SubmitLocalSources_Event(self):
+
+        selected_files = []
+
+        for filepath, var in self.local_file_checkboxes:
+            if var.get():
+                selected_files.append(filepath)
+
+        self.inference_config = {
+            "source_type": "local",
+            "sources": selected_files
+        }
+
+        self.AppendInferenceLog_Event("INFO", f"Local source: {len(selected_files)} files submitted")
+
+    def SubmitYoutubeSources_Event(self):
+
+        url = self.youtube_entry.get().strip()
+        if not url:
+            self.AppendInferenceLog_Event("ERROR", "Please enter a youtube URL")
+            return
+
+        self.inference_config = {
+            "source_type": "youtube",
+            "sources": [
+                url
+            ]
+        }
+
+        self.AppendInferenceLog_Event("INFO", f"Youtube URL selected: {url}")
+
     def InferenceLog_WidgetConfigure(self):
         
         # Inference log label
@@ -365,7 +542,7 @@ class MainWindow(DragnDropSources):
             = customtkinter.CTkLabel(self.inference_log_frame,
                                      text="✓ Inference log",
                                      font=customtkinter.CTkFont(size=18, weight="bold"))
-        self.inference_log_label.pack(anchor="w", padx=5, pady=(10, 5))
+        self.inference_log_label.pack(anchor="w", padx=15, pady=(10, 5))
 
         # Clear Log button
         self.clear_log_button \
@@ -373,12 +550,20 @@ class MainWindow(DragnDropSources):
                                       text="Clear log",
                                       command=self.ClearInferenceLog_Event,
                                       font=customtkinter.CTkFont(size=14, slant="italic"))
-        self.clear_log_button.pack(anchor="w", padx=5, pady=(5, 10))
+        self.clear_log_button.pack(anchor="w", padx=15, pady=(5, 10))
 
         # Inference Progress textbox
         self.inference_log_textbox \
             = InferenceLogTextbox(self.inference_log_frame)
         self.inference_log_textbox.pack(fill="both", expand=True, padx=10, pady=(10, 10))
+
+    def AppendInferenceLog_Event(self, log_type, message):
+
+        self.inference_log_textbox.append_log(log_type, message)
+
+    def ClearInferenceLog_Event(self):
+
+        self.inference_log_textbox.clear()
 
     def InferenceControl_WidgetConfigure(self):
 
@@ -548,15 +733,26 @@ class MainWindow(DragnDropSources):
                                       font=customtkinter.CTkFont(size=14))
         self.stop_button.pack(fill="x", padx=10, pady=(5, 20))
 
+    def ConfidenceSlider_Event(self, value):
+
+        self.confidence_value_label.configure(text=f"{value:.2f}")
+
+    def IoUSlider_Event(self, value):
+
+        self.iou_value_label.configure(text=f"{value:.2f}")
+
+    # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
 
         pass
 
+    # DATASET PANEL SETUP -----------------------------------------#
     def DatasetPanel_Adapter(self):
 
         pass
 
-    def FrameSelection(self, frame_name):
+    # FRAME SELECTION SETUP ---------------------------------------#
+    def FrameSelection_Adapter(self, frame_name):
 
         self.inference_menu_tab.configure(fg_color="transparent")
 
@@ -580,190 +776,15 @@ class MainWindow(DragnDropSources):
 
     def InferenceFrame_Event(self):
 
-        self.FrameSelection("Inference")
+        self.FrameSelection_Adapter("Inference")
 
     def TrainFrame_Event(self):
 
-        self.FrameSelection("Train")
+        self.FrameSelection_Adapter("Train")
 
     def DatasetFrame_Event(self):
 
-        self.FrameSelection("Dataset")
-
-    def SourcesDrop_Event(self, event):
-
-        filepath = event.data.strip()
-
-        if filepath.startswith("{"):
-            filepath = filepath[1:-1]
-
-        if filepath not in self.local_sourcefiles:
-            self.local_sourcefiles.append(filepath)
-            self.AppendInferenceLog_Event(f"[INFO] Source added: {filepath}")
-
-        self.ShowLocalSourceFiles_Event()
-
-    def DropEnter_Event(self, event):
-
-        self.drop_zone_entry.configure(border_width=2, border_color="#00AA55")
-
-        return event.action
-
-    def DropLeave_Event(self, event):
-
-        self.drop_zone_entry.configure(border_width=1, border_color=("gray50", "gray50"))
-
-        return event.action
-
-    def BrowseLocalFiles_Event(self):
-
-        filepaths = filedialog.askopenfilenames(
-            title="Select Source Files",
-            filetypes=[
-                (
-                    "Media Files",
-                    "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv"
-                )
-            ]
-        )
-
-        if not filepaths:
-            return
-
-        for filepath in filepaths:
-            if filepath not in self.local_sourcefiles:
-                self.local_sourcefiles.append(filepath)
-
-        self.ShowLocalSourceFiles_Event()
-        self.AppendInferenceLog_Event(f"[INFO] Added {len(filepaths)} source files")
-
-    def ShowLocalSourceFiles_Event(self):
-
-        for widget in self.source_list_checkbox.winfo_children():
-            widget.destroy()
-
-        self.local_file_checkboxes.clear()
-
-        # select all show
-        self.select_all_var = customtkinter.BooleanVar(value=True)
-        select_all_checkbox \
-            = customtkinter.CTkCheckBox(self.source_list_checkbox,
-                                        text="Select All",
-                                        variable=self.select_all_var,
-                                        command=self.SelectAllSources_Event)
-        select_all_checkbox.pack(anchor="w", padx=10, pady=(10, 20))
-
-        # individual file checkboxes
-        for filepath in self.local_sourcefiles:
-            var = customtkinter.BooleanVar(value=True)
-            checkbox \
-                = customtkinter.CTkCheckBox(self.source_list_checkbox, text=filepath, variable=var)
-            checkbox.pack(anchor="w", padx=25, pady=5)
-            self.local_file_checkboxes.append((filepath, var))
-
-        submit_button \
-            = customtkinter.CTkButton(self.source_list_checkbox,
-                                      text="Submit Sources",
-                                      command=self.SubmitLocalSources_Event)
-        submit_button.pack(anchor="center", pady=25)
-
-    def SelectAllSources_Event(self):
-
-        state = self.select_all_var.get()
-
-        for _, var in self.local_file_checkboxes:
-            var.set(state)
-
-    def SubmitLocalSources_Event(self):
-
-        selected_files = []
-
-        for filepath, var in self.local_file_checkboxes:
-            if var.get():
-                selected_files.append(filepath)
-
-        self.inference_config = {
-            "source_type": "local",
-            "sources": selected_files
-        }
-
-        self.AppendInferenceLog_Event(f"[INFO] Local source: {len(selected_files)} files submitted")
-
-    def SubmitYoutubeSources_Event(self):
-
-        url = self.youtube_entry.get().strip()
-        if not url:
-            self.AppendInferenceLog_Event("[ERROR] Please enter a youtube URL")
-            return
-        
-        self.inference_config = {
-            "source_type": "youtube",
-            "sources": [
-                url
-            ]
-        }
-
-        self.AppendInferenceLog_Event(f"[INFO] Youtube URL selected: {url}")
-
-    def SourceTypeChanged_Event(self, source_type):
-
-        # Hide all widgets first
-        self.upload_files_label.pack_forget()
-        self.drop_zone_entry.pack_forget()
-        self.or_label.pack_forget()
-        self.browse_files_button.pack_forget()
-        self.youtube_label.pack_forget()
-        self.youtube_entry.pack_forget()
-        self.submit_youtube_url_button.pack_forget()
-        self.source_files_list_label.pack_forget()
-        self.source_list_checkbox.pack_forget()
-
-        if source_type == "Youtube URL":
-            self.youtube_label.pack(anchor="center", padx=5, pady=(50, 10))
-            self.youtube_entry.pack(anchor="center", pady=(10, 10))
-            self.submit_youtube_url_button.pack(anchor="center", pady=(50, 10))
-        elif source_type == "Local Files":
-            self.upload_files_label.pack(anchor="center", padx=5, pady=(50, 10))
-            self.drop_zone_entry.pack(anchor="center", pady=(10, 5))
-            self.or_label.pack(anchor="center", pady=(5, 5))
-            self.browse_files_button.pack(anchor="center", pady=(5, 10))
-            self.source_files_list_label.pack(anchor="center", pady=(50, 10))
-            self.source_list_checkbox.pack(anchor="center", padx=5, pady=10)
-
-    def ConfidenceSlider_Event(self, value):
-
-        self.confidence_value_label.configure(text=f"{value:.2f}")
-
-    def IoUSlider_Event(self, value):
-
-        self.iou_value_label.configure(text=f"{value:.2f}")
-
-    def AppendInferenceLog_Event(self, message):
-
-        self.inference_log_textbox.append(f"{message}\n")
-
-    def ClearInferenceLog_Event(self):
-
-        self.inference_log_textbox.clear()
-
-    def OnClosingApp_Event(self):
-
-        msg_ExitSystem \
-            = CTkMessagebox(master=self,
-                            title="Exit",
-                            message="Do you want to exit the FaceID Enrollment System",
-                            icon="question",
-                            option_1="Cancel",
-                            option_2="Exit")
-        if msg_ExitSystem.get() == "Exit":
-            if hasattr(self, "face_processor"):
-                self.face_processor.stop()
-
-            if hasattr(self, "camera_stream"):
-                self.camera_stream.stop()
-
-            self.destroy()
-            sys.exit()
+        self.FrameSelection_Adapter("Dataset")
 
     # ------------------- FUNCTIONALITY SETUP RESOURCE ------------------- #
     # ---------------------------------------------------------------------#
