@@ -43,7 +43,6 @@ class InferenceProcessor:
         try:
             self.load_model()
             source = self.source_process()
-            self.log("INFO", f"Source loaded: {source}")
             self.process_source(source)
             self.log("INFO", "Inference completed")
         except Exception as e:
@@ -89,7 +88,7 @@ class InferenceProcessor:
 
             ydl_opts = {
                 "quiet": True,
-                "format": "best[height<=720]",
+                "format": "best",
                 "noplaylist": True,
                 "extract_flat": False,
                 "cookiefile": "/home/dacduong/Downloads/cookies.txt"

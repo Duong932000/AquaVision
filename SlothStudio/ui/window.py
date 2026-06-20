@@ -1,7 +1,6 @@
 
 import cv2
 import sys
-import json
 import time
 import numpy
 import customtkinter
@@ -14,6 +13,7 @@ from tkinterdnd2 import TkinterDnD, DND_ALL
 
 # internal modules
 from config.assets import asset_resources
+from processor.system_monitor import SystemUsageMonitor
 from processor.inference_processor import InferenceProcessor
 
 # custom appearance of UI
@@ -78,6 +78,9 @@ class MainWindow(DragnDropSources):
         super().__init__(*args, **kwargs)
 
         # INFERENCE DISPLAY VARIABLE -------------------------------------------------#
+        # inference mode
+        self.inference_mode = False
+
         # inference config json
         self.inference_config = {}
 
@@ -117,6 +120,8 @@ class MainWindow(DragnDropSources):
         self.frame_queue = Queue(maxsize=1)
         self.last_frame_time = 0
 
+        self.system_monitor = SystemUsageMonitor()
+
         # init UI
         self.GUI_InitSetupResources_Controller()
 
@@ -127,7 +132,7 @@ class MainWindow(DragnDropSources):
         self.GUI_CoreFunctionality_Controller()
 
         self.after(30, self.RenderFrameLoop_Event)
-
+        self.after(1000, self.UpdateSystemMonitor_Event)
     # ------------------- INIT SETUP RESOURCE ------------------- #
     # ------------------------------------------------------------#
     def GUI_InitSetupResources_Controller(self):
@@ -176,8 +181,8 @@ class MainWindow(DragnDropSources):
         self.dataset_img = customtkinter.CTkImage(
             Image.open(asset_resources("dataset.png")), size=(25, 25))
 
-        self.dragdrop_img = customtkinter.CTkImage(
-            Image.open(asset_resources("dragdrop.png")), size=(50, 50))
+        self.monitoring_img = customtkinter.CTkImage(
+            Image.open(asset_resources("monitoring.png")), size=(30, 30))
 
     def OnClosingApp_Event(self):
 
@@ -277,8 +282,57 @@ class MainWindow(DragnDropSources):
                                       font=customtkinter.CTkFont(size=16, slant="italic"))
         self.dataset_menu_tab.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
 
-        # Spacer
-        self.menu_panel.grid_rowconfigure(4, weight=1)
+        # System Monitor frame
+        self.system_monitor_frame \
+            = customtkinter.CTkFrame(self.menu_panel, corner_radius=10)
+        self.system_monitor_frame.grid(row=4, column=0, padx=15, pady=(10, 10), sticky="ew")
+
+        self.system_monitor_title \
+            = customtkinter.CTkButton(self.system_monitor_frame,
+                                      text=" System Monitor",
+                                      anchor="w",
+                                      state="disabled",
+                                      fg_color="transparent",
+                                      text_color=("gray10", "gray90"),
+                                      hover_color=("gray70", "gray30"),
+                                      image=self.monitoring_img,
+                                      font=customtkinter.CTkFont(size=16, slant="italic"))
+        self.system_monitor_title.pack(anchor="w", padx=0, pady=(10, 5))
+
+        self.cpu_label \
+            = customtkinter.CTkLabel(self.system_monitor_frame, text="CPU: 0%")
+        self.cpu_label.pack(anchor="w", padx=10)
+
+        self.ram_label \
+            = customtkinter.CTkLabel(self.system_monitor_frame, text="RAM: 0 / 0 GB")
+        self.ram_label.pack(anchor="w", padx=10)
+
+        self.gpu_label \
+            = customtkinter.CTkLabel(self.system_monitor_frame, text="GPU: N/A")
+        self.gpu_label.pack(anchor="w", padx=10)
+
+        self.vram_label \
+            = customtkinter.CTkLabel(self.system_monitor_frame, text="VRAM: N/A")
+        self.vram_label.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # show menu panel
+        self.menu_panel.grid_rowconfigure(5, weight=1)
+
+        # runtime mode frame
+        self.inference_runtime_frame \
+            = customtkinter.CTkFrame(self.menu_panel, corner_radius=10)
+
+        self.stop_runtime_button \
+            = customtkinter.CTkButton(self.inference_runtime_frame,
+                                      text="Stop Inference",
+                                      command=self.StopInference_Event)
+        self.stop_runtime_button.pack(fill="x", padx=10, pady=(10, 10))
+
+        self.runtime_log_textbox \
+            = InferenceLogTextbox(self.inference_runtime_frame,
+                                  textbox_width=260,
+                                  textbox_height=500)
+        self.runtime_log_textbox.pack(fill="both", expand=True, padx=5, pady=5)
 
     # DISPLAY PANEL SETUP -----------------------------------------#
     def DisplayPanel_Adapter(self):
@@ -298,6 +352,58 @@ class MainWindow(DragnDropSources):
         for frame in (self.inference_frame, self.train_frame, self.dataset_frame):
             frame.grid_rowconfigure(0, weight=1)
             frame.grid_columnconfigure(0, weight=1)
+
+        # fullscreen inference mode
+        self.fullscreen_render_label \
+            = customtkinter.CTkLabel(self.display_panel, text="")
+
+    def UpdateSystemMonitor_Event(self):
+
+        usage = self.system_monitor.get_usage()
+
+        self.cpu_label.configure(
+            text=f"CPU: {usage['cpu_percent']:.1f}%"
+        )
+
+        self.ram_label.configure(
+            text=(
+                f"RAM: "
+                f"{usage['ram_used_gb']:.1f}/"
+                f"{usage['ram_total_gb']:.1f} GB"
+            )
+        )
+
+        if usage["gpu_percent"] is not None:
+
+            self.gpu_label.configure(
+                text=f"GPU: {usage['gpu_percent']:.1f}%"
+            )
+
+            self.vram_label.configure(
+                text=(
+                    f"VRAM: "
+                    f"{usage['gpu_memory_used_gb']:.1f}/"
+                    f"{usage['gpu_memory_total_gb']:.1f} GB"
+                )
+            )
+
+        else:
+
+            self.gpu_label.configure(
+                text="GPU: N/A"
+            )
+
+            self.vram_label.configure(
+                text="VRAM: N/A"
+            )
+
+        self.after(
+            1000,
+            self.UpdateSystemMonitor_Event
+        )
+
+
+
 
     # INFERENCE PANEL SETUP ---------------------------------------#
     def InferencePanel_Adapter(self):
@@ -442,14 +548,6 @@ class MainWindow(DragnDropSources):
                                       text="Submit URL",
                                       command=self.SubmitYoutubeSources_Event,
                                       font=customtkinter.CTkFont(size=28))
-
-        # ----------------------------------------------------------------------------#
-        # Render video/image Label configuration
-        # ----------------------------------------------------------------------------#
-        self.render_display_label \
-            = customtkinter.CTkLabel(self.inference_display_frame, text="")
-        self.render_display_label.place(relx=0, rely=0, relwidth=1, relheight=1)
-        self.render_display_label.lower()
 
         self.SourceTypeChanged_Event(self.source_type_var.get())
 
@@ -619,6 +717,9 @@ class MainWindow(DragnDropSources):
     def AppendInferenceLog_Event(self, log_type, message):
 
         self.inference_log_textbox.append_log(log_type, message)
+
+        if self.inference_mode:
+            self.runtime_log_textbox.append_log(log_type, message)
 
     def ClearInferenceLog_Event(self):
 
@@ -840,14 +941,14 @@ class MainWindow(DragnDropSources):
         self.start_button.pack(fill="x", padx=10, pady=(25, 10))
 
         # Stop inference button
-        self.stop_button \
-            = customtkinter.CTkButton(self.control_scroll_frame,
-                                      text="Stop Inference",
-                                      command=self.StopInference_Event,
-                                      height=40,
-                                      fg_color="darkred",
-                                      font=customtkinter.CTkFont(size=14))
-        self.stop_button.pack(fill="x", padx=10, pady=(5, 20))
+        # self.stop_button \
+        #     = customtkinter.CTkButton(self.control_scroll_frame,
+        #                               text="Stop Inference",
+        #                               command=self.StopInference_Event,
+        #                               height=40,
+        #                               fg_color="darkred",
+        #                               font=customtkinter.CTkFont(size=14))
+        # self.stop_button.pack(fill="x", padx=10, pady=(5, 20))
 
         self.ModelSourceChanged_Event()
 
@@ -948,8 +1049,8 @@ class MainWindow(DragnDropSources):
         if self.inference_processor is not None and self.inference_processor.running:
             self.AppendInferenceLog_Event("WARNING", "Inference is already running")
             return
-        
-        self.ShowInferenceRender_Event()
+
+        self.EnterInferenceMode_Event()
         self.AppendInferenceLog_Event("INFO", "Starting inference model ...")
 
         self.inference_processor \
@@ -978,23 +1079,20 @@ class MainWindow(DragnDropSources):
         if self.inference_processor:
             self.inference_processor.stop()
 
-        self.render_display_label.lower()
+        self.ExitInferenceMode_Event()
 
-        self.SourceTypeChanged_Event(self.source_type_var.get())
         self.AppendInferenceLog_Event("INFO", "Inference stopped")
 
-    def UpdateInferenceFrame_Event(self, frame):
-
-        self.render_display_label.after(0, lambda: self._update_frame_ui(frame))
-
-    def _update_frame_ui(self, frame):
+    def UpdateInferenceFrameUI_Event(self, frame):
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         frame_h, frame_w = rgb.shape[:2]
 
-        width = self.render_display_label.winfo_width()
-        height = self.render_display_label.winfo_height()
+        target = self.fullscreen_render_label
+
+        width = target.winfo_width()
+        height = target.winfo_height()
 
         if width < 10 or height < 10:
             return
@@ -1017,43 +1115,49 @@ class MainWindow(DragnDropSources):
         image = Image.fromarray(canvas)
         photo = ImageTk.PhotoImage(image)
 
-        self.render_display_label.configure(image=photo)
-        self.render_display_label.image = photo
-
-    def ShowInferenceRender_Event(self):
-
-        widgets = [
-            # for local source
-            self.source_type_optionmenu,
-            self.upload_files_label,
-            self.drop_zone_entry,
-            self.or_label,
-            self.browse_files_button,
-            self.source_files_list_label,
-            self.source_list_checkbox,
-
-            # below for youtube sources
-            self.youtube_label,
-            self.clear_url_button,
-            self.youtube_entry,
-            self.submit_youtube_url_button
-        ]
-
-        for widget in widgets:
-            widget.pack_forget()
-
-        # show render frame
-        self.render_display_label.lift()
+        target.configure(image=photo)
+        target.image = photo
 
     def RenderFrameLoop_Event(self):
 
         try:
             frame = self.frame_queue.get(timeout=0.05)
-            self.UpdateInferenceFrame_Event(frame)
+            self.UpdateInferenceFrameUI_Event(frame)
         except Empty:
             pass
-
         self.after(15, self.RenderFrameLoop_Event)
+
+    def EnterInferenceMode_Event(self):
+
+        self.inference_mode = True
+
+        # hide config panels
+        self.inference_log_frame.grid_remove()
+        self.inference_control_frame.grid_remove()
+
+        # fullscreen video
+        self.fullscreen_render_label.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+        self.fullscreen_render_label.lift()
+
+        # runtime menu
+        self.inference_runtime_frame.grid(row=5, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.runtime_log_textbox.clear()
+
+    def ExitInferenceMode_Event(self):
+
+        self.inference_mode = False
+
+        self.fullscreen_render_label.place_forget()
+
+        self.inference_runtime_frame.grid_remove()
+
+        self.inference_log_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+
+        self.inference_control_frame.grid(row=0, column=2, padx=5, pady=0, sticky="nsew")
+
+        self.SourceTypeChanged_Event(self.source_type_var.get())
 
     # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
