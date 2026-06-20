@@ -1,15 +1,16 @@
-import json
+
+import cv2
 import sys
+import json
+import time
+import numpy
 import customtkinter
-from PIL import Image
 from datetime import datetime
+from PIL import Image, ImageTk
+from queue import Queue, Empty
 from tkinter import filedialog
 from CTkMessagebox import CTkMessagebox
 from tkinterdnd2 import TkinterDnD, DND_ALL
-from PIL import Image
-from PIL import ImageTk
-
-import cv2
 
 # internal modules
 from config.assets import asset_resources
@@ -76,18 +77,45 @@ class MainWindow(DragnDropSources):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # inference display variable
+        # INFERENCE DISPLAY VARIABLE -------------------------------------------------#
+        # inference config json
         self.inference_config = {}
-        self.selected_local_sources = []
-        self.selected_youtube_url = []
-        self.local_file_checkboxes = []
-        self.source_type_var = customtkinter.StringVar(value="Youtube URL")
 
-        # inference control variable
-        self.model_selection_var = customtkinter.StringVar(value="Trained")
-        self.trained_model_var = customtkinter.StringVar(value="")
-        self.pretrained_version_var = customtkinter.StringVar(value="YOLO26")
-        self.pretrained_size_var = customtkinter.StringVar(value="n")
+        self.selected_local_sources = []
+        self.local_file_checkboxes = []
+
+        # widget variable
+        self.youtube_url_var = customtkinter.StringVar(value="")               # variable for youtube url entry
+        self.source_type_var = customtkinter.StringVar(value="Youtube URL")    # variable for source option menu
+
+        # INFERENCE CONTROL VARIABLE -------------------------------------------------#
+        # variable model selection
+        self.model_selection_var = customtkinter.StringVar(value="Trained")    # variable for model selection: Trained  |  Pretrained
+        self.trained_model_var = customtkinter.StringVar(value="")             # variable for trained model
+        self.pretrained_version_var = customtkinter.StringVar(value="YOLO26")  # variable for pretrained version
+        self.pretrained_size_var = customtkinter.StringVar(value="n")          # variable for pretrained size
+
+        # variable tracker
+        self.enable_tracking_var = customtkinter.BooleanVar(value=True)
+        self.tracker_var = customtkinter.StringVar(value="ByteTrack")
+
+        # variable detection
+        self.confidence_var = customtkinter.DoubleVar(value=0.25)
+        self.iou_var = customtkinter.DoubleVar(value=0.45)
+
+        # varible output
+        self.save_video_var = customtkinter.BooleanVar(value=False)
+        self.save_frames_var = customtkinter.BooleanVar(value=False)
+
+        # variable runtime
+        self.device_var = customtkinter.StringVar(value="Auto")
+
+        # processor
+        self.inference_processor = None
+
+        # frame queue
+        self.frame_queue = Queue(maxsize=1)
+        self.last_frame_time = 0
 
         # init UI
         self.GUI_InitSetupResources_Controller()
@@ -97,6 +125,8 @@ class MainWindow(DragnDropSources):
 
         # start core functionality
         self.GUI_CoreFunctionality_Controller()
+
+        self.after(30, self.RenderFrameLoop_Event)
 
     # ------------------- INIT SETUP RESOURCE ------------------- #
     # ------------------------------------------------------------#
@@ -280,11 +310,11 @@ class MainWindow(DragnDropSources):
 
         # Create Subframes
         # video frame
-        self.inference_video_frame \
+        self.inference_display_frame \
             = customtkinter.CTkFrame(self.inference_frame, corner_radius=10)
-        self.inference_video_frame.grid(row=0, column=0, padx=(10, 5), pady=5, sticky="snew")
-        self.inference_video_frame.grid_rowconfigure(0, weight=1)
-        self.inference_video_frame.grid_columnconfigure(0, weight=1)
+        self.inference_display_frame.grid(row=0, column=0, padx=(10, 5), pady=5, sticky="snew")
+        self.inference_display_frame.grid_rowconfigure(0, weight=1)
+        self.inference_display_frame.grid_columnconfigure(0, weight=1)
 
         # inference log frame
         self.inference_log_frame \
@@ -312,14 +342,14 @@ class MainWindow(DragnDropSources):
         # ----------------------------------------------------------------------------#
         # Display panel label
         self.display_panel_label \
-            = customtkinter.CTkLabel(self.inference_video_frame,
+            = customtkinter.CTkLabel(self.inference_display_frame,
                                      text="✓ Display Panel",
                                      font=customtkinter.CTkFont(size=18, weight="bold"))
         self.display_panel_label.pack(anchor="w", padx=5, pady=(10, 5))
 
         # source type options
         self.source_type_optionmenu \
-            = customtkinter.CTkOptionMenu(self.inference_video_frame,
+            = customtkinter.CTkOptionMenu(self.inference_display_frame,
                                           width=150,
                                           height=30,
                                           variable=self.source_type_var,
@@ -331,14 +361,14 @@ class MainWindow(DragnDropSources):
         # Local widget configuration
         # ----------------------------------------------------------------------------#
         self.upload_files_label \
-            = customtkinter.CTkLabel(self.inference_video_frame,
+            = customtkinter.CTkLabel(self.inference_display_frame,
                                      text="▼ Upload Source Files ▼",
                                      text_color="#90EE90",
                                      font=customtkinter.CTkFont(size=22))
 
         # drop frame
         self.drop_zone_entry \
-            = customtkinter.CTkEntry(self.inference_video_frame,
+            = customtkinter.CTkEntry(self.inference_display_frame,
                                      width=690,
                                      height=200,
                                      placeholder_text="Drag and Drop source files here ...",
@@ -353,14 +383,14 @@ class MainWindow(DragnDropSources):
     
         # or label
         self.or_label \
-            = customtkinter.CTkLabel(self.inference_video_frame,
+            = customtkinter.CTkLabel(self.inference_display_frame,
                                      text="Or",
                                      text_color="#90EE90",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
 
         # Browse file button
         self.browse_files_button \
-            = customtkinter.CTkButton(self.inference_video_frame,
+            = customtkinter.CTkButton(self.inference_display_frame,
                                       width=50,
                                       height=25,
                                       text="Browse Files",
@@ -368,41 +398,58 @@ class MainWindow(DragnDropSources):
                                       font=customtkinter.CTkFont(size=28))
 
         self.source_files_list_label \
-            = customtkinter.CTkLabel(self.inference_video_frame,
+            = customtkinter.CTkLabel(self.inference_display_frame,
                                      text="▼ Source Files List ▼",
                                      text_color="#87CEFA",
                                      font=customtkinter.CTkFont(size=22))
 
         # source list frame
         self.source_list_checkbox \
-            = customtkinter.CTkScrollableFrame(self.inference_video_frame,
+            = customtkinter.CTkScrollableFrame(self.inference_display_frame,
                                                width=760, height=390,
                                                border_color="#90EE90")
 
         # ----------------------------------------------------------------------------#
         # Youtube widget configuration
         # ----------------------------------------------------------------------------#
-        # or label
+        # youtube message label
         self.youtube_label \
-            = customtkinter.CTkLabel(self.inference_video_frame,
+            = customtkinter.CTkLabel(self.inference_display_frame,
                                      text="▼ Youtube URL: Paste a link to the content you want to inference ▼",
                                      text_color="#90EE90",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
-
+        # clear button
+        self.clear_url_button \
+            = customtkinter.CTkButton(self.inference_display_frame,
+                                      width=25,
+                                      height=25,
+                                      text="Clear URL",
+                                      command=self.ClearURL_Event,
+                                      font=customtkinter.CTkFont(size=14))
+        
         # youtube entry
         self.youtube_entry \
-            = customtkinter.CTkEntry(self.inference_video_frame,
-                                    width=690,
-                                    height=50,
-                                    placeholder_text="https://www.youtube.com/watch?v=...")
+            = customtkinter.CTkEntry(self.inference_display_frame,
+                                     textvariable=self.youtube_url_var,
+                                     width=690,
+                                     height=50,
+                                     placeholder_text="https://www.youtube.com/watch?v=...")
 
         self.submit_youtube_url_button \
-            = customtkinter.CTkButton(self.inference_video_frame,
+            = customtkinter.CTkButton(self.inference_display_frame,
                                       width=50,
                                       height=25,
                                       text="Submit URL",
                                       command=self.SubmitYoutubeSources_Event,
                                       font=customtkinter.CTkFont(size=28))
+
+        # ----------------------------------------------------------------------------#
+        # Render video/image Label configuration
+        # ----------------------------------------------------------------------------#
+        self.render_display_label \
+            = customtkinter.CTkLabel(self.inference_display_frame, text="")
+        self.render_display_label.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.render_display_label.lower()
 
         self.SourceTypeChanged_Event(self.source_type_var.get())
 
@@ -415,6 +462,7 @@ class MainWindow(DragnDropSources):
         self.browse_files_button.pack_forget()
         self.youtube_label.pack_forget()
         self.youtube_entry.pack_forget()
+        self.clear_url_button.pack_forget()
         self.submit_youtube_url_button.pack_forget()
         self.source_files_list_label.pack_forget()
         self.source_list_checkbox.pack_forget()
@@ -422,6 +470,7 @@ class MainWindow(DragnDropSources):
         if source_type == "Youtube URL":
             self.youtube_label.pack(anchor="center", padx=5, pady=(50, 10))
             self.youtube_entry.pack(anchor="center", pady=(10, 10))
+            self.clear_url_button.pack(anchor="w", padx=80, pady=(10, 10))
             self.submit_youtube_url_button.pack(anchor="center", pady=(50, 10))
         elif source_type == "Local Files":
             self.upload_files_label.pack(anchor="center", padx=5, pady=(50, 10))
@@ -458,16 +507,13 @@ class MainWindow(DragnDropSources):
 
     def BrowseLocalSourceFiles_Event(self):
 
-        filepaths = filedialog.askopenfilenames(
-            title="Select Source Files",
-            filetypes=[
-                (
-                    "Media Files",
-                    "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv"
-                )
-            ]
-        )
-
+        filepaths \
+            = filedialog.askopenfilenames(title="Select Source Files",
+                                          filetypes=[(
+                                                        "Media Files",
+                                                        "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv"
+                                                    )
+                                                ])
         if not filepaths:
             return
 
@@ -533,26 +579,20 @@ class MainWindow(DragnDropSources):
 
         self.AppendInferenceLog_Event("INFO", f"Local source: {len(selected_files)} files submitted")
 
-        print(json.dumps(config, indent=4))
-
     def SubmitYoutubeSources_Event(self):
 
-        url = self.youtube_entry.get().strip()
-        if not url:
+        youtube_url = self.youtube_url_var.get().strip()
+
+        if not youtube_url:
             self.AppendInferenceLog_Event("ERROR", "Please enter a youtube URL")
             return
 
-        if not url:
-            self.AppendInferenceLog_Event("ERROR", "Please enter a Youtube URL")
-            return
-        
-        self.selected_youtube_url = url
+        self.AppendInferenceLog_Event("INFO", f"Youtube URL selected: {youtube_url}")
 
-        config = self.BuildInferenceConfig_Event()
+    def ClearURL_Event(self):
 
-        self.AppendInferenceLog_Event("INFO", f"Youtube URL selected: {url}")
-
-        print(json.dumps(config, indent=4))
+        self.youtube_url_var.set("")
+        self.AppendInferenceLog_Event("INFO", "Youtube URL cleared")
 
     def InferenceLog_WidgetConfigure(self):
         
@@ -679,13 +719,16 @@ class MainWindow(DragnDropSources):
 
         # Tracking checkbox
         self.enable_tracking_checkbox \
-            = customtkinter.CTkCheckBox(self.control_scroll_frame, text="Enable Tracking")
+            = customtkinter.CTkCheckBox(self.control_scroll_frame,
+                                        text="Enable Tracking",
+                                        variable=self.enable_tracking_var)
         self.enable_tracking_checkbox.select()
         self.enable_tracking_checkbox.pack(anchor="w", padx=10, pady=5)
 
         # Tracker combobox
         self.tracker_combobox \
             = customtkinter.CTkComboBox(self.control_scroll_frame,
+                                        variable=self.tracker_var,
                                         values=["ByteTrack", "BoT-SORT"])
         self.tracker_combobox.set("ByteTrack")
         self.tracker_combobox.pack(fill="x", padx=10, pady=10)
@@ -718,8 +761,10 @@ class MainWindow(DragnDropSources):
         # Confidence slider
         self.confidence_slider \
             = customtkinter.CTkSlider(self.control_scroll_frame,
+                                      variable=self.confidence_var,
                                       command=self.ConfidenceSlider_Event,
-                                      from_=0.05, to=1.0)
+                                      from_=0.05,
+                                      to=1.0)
         self.confidence_slider.set(0.25)
         self.confidence_slider.pack(fill="x", padx=10, pady=5)
 
@@ -739,6 +784,7 @@ class MainWindow(DragnDropSources):
         # IoU slider
         self.iou_slider \
             = customtkinter.CTkSlider(self.control_scroll_frame,
+                                      variable=self.iou_var,
                                       command=self.IoUSlider_Event,
                                       from_=0.1, to=1.0)
         self.iou_slider.set(0.45)
@@ -754,13 +800,15 @@ class MainWindow(DragnDropSources):
         # Save video checkbox
         self.save_video_checkbox = \
             customtkinter.CTkCheckBox(self.control_scroll_frame,
-                                     text="Save Output Video/Image")
+                                     text="Save Output Video/Image",
+                                     variable=self.save_video_var)
         self.save_video_checkbox.pack(anchor="w", padx=10, pady=5)
 
         # Save Frame checkbox
         self.save_frames_checkbox = \
             customtkinter.CTkCheckBox(self.control_scroll_frame,
-                                      text="Save Detection Frames")
+                                      text="Save Detection Frames",
+                                      variable=self.save_frames_var)
         self.save_frames_checkbox.pack(anchor="w", padx=10, pady=5)
 
         # Runtime label
@@ -773,6 +821,7 @@ class MainWindow(DragnDropSources):
         # device combobox
         self.device_combobox = \
             customtkinter.CTkComboBox(self.control_scroll_frame,
+                                      variable=self.device_var,
                                       values=[
                                           "Auto",
                                           "CPU",
@@ -807,49 +856,52 @@ class MainWindow(DragnDropSources):
         config = {}
 
         # source process
-        source_type = self.source_type_var.get()
-        if source_type == "Local Files":
-            config["source_type"] = "local"
-            config["sources"] = self.selected_local_sources
+        if self.source_type_var.get() == "Local Files":
+            config["source"] = {
+                "type": "local",
+                "items": self.selected_local_sources
+            }
         else:
-            config["source_type"] = "youtube"
-            if self.selected_youtube_url:
-                config["sources"] = [self.selected_youtube_url]
-            else:
-                config["sources"] = []
-        
-        # model path process
-        config["model"] = {
-            "model_selection": self.model_selection_var.get()
-        }
-        
-        if self.model_selection_var.get() == "Trained":
-            config["model"]["path"] = self.trained_model_var.get()
-        else:
-            config["model"]["version"] = self.pretrained_version_var.get()
-            config["model"]["size"] = self.pretrained_size_var.get()
+            config["source"] = {
+                "type": "youtube",
+                "items": [self.youtube_url_var.get()]
+                if self.youtube_url_var.get() else []
+            }
 
-        # tracker process
+        # model process
+        if self.model_selection_var.get() == "Trained":
+            config["model"] = {
+                "type": "trained",
+                "path": self.trained_model_var.get()
+            }
+        else:
+            config["model"] = {
+                "type": "pretrained",
+                "version": self.pretrained_version_var.get(),
+                "size": self.pretrained_size_var.get()
+            }
+
+        # tracking process
         config["tracking"] = {
-            "enabled": bool(self.enable_tracking_checkbox.get()),
-            "tracker": self.tracker_combobox.get()
+            "enabled": self.enable_tracking_var.get(),
+            "tracker": self.tracker_var.get()
         }
 
         # detection process
         config["detection"] = {
-            "confidence": round(self.confidence_slider.get(), 2),
-            "iou": round(self.iou_slider.get(), 2)
+            "confidence": round(self.confidence_var.get(), 2),
+            "iou": round(self.iou_var.get(), 2)
         }
 
         # output process
         config["output"] = {
-            "save_video": bool(self.save_video_checkbox.get()),
-            "save_frames": bool(self.save_frames_checkbox.get())
+            "save_video": self.save_video_var.get(),
+            "save_frames": self.save_frames_var.get()
         }
 
         # runtime process
         config["runtime"] = {
-            "device": self.device_combobox.get()
+            "device": self.device_var.get()
         }
 
         self.inference_config = config
@@ -871,6 +923,8 @@ class MainWindow(DragnDropSources):
                                               filetypes=[("PyTorch Model", "*.pt")])
 
         if not filepath:
+            self.AppendInferenceLog_Event("WARNING",
+                                          f"Model path not foun. Please enter model to continue!")
             return
 
         self.trained_model_var.set(filepath)
@@ -887,54 +941,119 @@ class MainWindow(DragnDropSources):
 
     def StartInference_Event(self):
 
-        config = self.BuildInferenceConfig_Event()
+        # build latest config
+        self.BuildInferenceConfig_Event()
 
-        if not config["sources"]:
+        # already running?
+        if self.inference_processor is not None and self.inference_processor.running:
+            self.AppendInferenceLog_Event("WARNING", "Inference is already running")
+            return
+        
+        self.ShowInferenceRender_Event()
+        self.AppendInferenceLog_Event("INFO", "Starting inference model ...")
 
-            self.AppendInferenceLog_Event(
-                "ERROR",
-                "No source selected"
-            )
+        self.inference_processor \
+            = InferenceProcessor(config=self.inference_config,
+                                frame_callback=self.EnqueueFrame_Event,
+                                log_callback=self.AppendInferenceLog_Event)
+        self.inference_processor.start()
+
+        self.AppendInferenceLog_Event("INFO", "Inference started")
+
+    def EnqueueFrame_Event(self, frame):
+
+        now = time.time()
+        if now - self.last_frame_time < 0.03:  # ~30 FPS cap
             return
 
-        self.processor = InferenceProcessor(
-            config=config,
-            frame_callback=self.UpdateInferenceFrame_Event,
-            log_callback=self.AppendInferenceLog_Event
-        )
+        self.last_frame_time = now
 
-        self.processor.start()
+        if self.frame_queue.full():
+            self.frame_queue.get_nowait()
+
+        self.frame_queue.put_nowait(frame)
 
     def StopInference_Event(self):
 
-        if hasattr(self, "processor"):
+        if self.inference_processor:
+            self.inference_processor.stop()
 
-            self.processor.stop()
+        self.render_display_label.lower()
+
+        self.SourceTypeChanged_Event(self.source_type_var.get())
+        self.AppendInferenceLog_Event("INFO", "Inference stopped")
 
     def UpdateInferenceFrame_Event(self, frame):
 
-        rgb = cv2.cvtColor(
-            frame,
-            cv2.COLOR_BGR2RGB
-        )
+        self.render_display_label.after(0, lambda: self._update_frame_ui(frame))
 
-        image = Image.fromarray(rgb)
+    def _update_frame_ui(self, frame):
 
-        image = image.resize(
-            (
-                self.video_display_label.winfo_width(),
-                self.video_display_label.winfo_height()
-            )
-        )
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+        frame_h, frame_w = rgb.shape[:2]
+
+        width = self.render_display_label.winfo_width()
+        height = self.render_display_label.winfo_height()
+
+        if width < 10 or height < 10:
+            return
+
+        scale = min(width / frame_w, height / frame_h)
+
+        new_w = int(frame_w * scale)
+        new_h = int(frame_h * scale)
+
+        resized = cv2.resize(rgb, (new_w, new_h))
+
+        canvas = numpy.zeros((height, width, 3), dtype=numpy.uint8)
+
+        x_offset = (width - new_w) // 2
+        y_offset = (height - new_h) // 2
+
+        canvas[y_offset:y_offset + new_h,
+            x_offset:x_offset + new_w] = resized
+
+        image = Image.fromarray(canvas)
         photo = ImageTk.PhotoImage(image)
 
-        self.video_display_label.configure(
-            image=photo,
-            text=""
-        )
+        self.render_display_label.configure(image=photo)
+        self.render_display_label.image = photo
 
-        self.video_display_label.image = photo
+    def ShowInferenceRender_Event(self):
+
+        widgets = [
+            # for local source
+            self.source_type_optionmenu,
+            self.upload_files_label,
+            self.drop_zone_entry,
+            self.or_label,
+            self.browse_files_button,
+            self.source_files_list_label,
+            self.source_list_checkbox,
+
+            # below for youtube sources
+            self.youtube_label,
+            self.clear_url_button,
+            self.youtube_entry,
+            self.submit_youtube_url_button
+        ]
+
+        for widget in widgets:
+            widget.pack_forget()
+
+        # show render frame
+        self.render_display_label.lift()
+
+    def RenderFrameLoop_Event(self):
+
+        try:
+            frame = self.frame_queue.get(timeout=0.05)
+            self.UpdateInferenceFrame_Event(frame)
+        except Empty:
+            pass
+
+        self.after(15, self.RenderFrameLoop_Event)
 
     # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
