@@ -46,3 +46,6 @@ examples/dataset/
 
 # src
 src/aquavision.egg-info/
+
+# output inference
+outputs/
