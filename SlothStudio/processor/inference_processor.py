@@ -1,8 +1,11 @@
+
 import os
 import cv2
+import json
 import yt_dlp
 import threading
 from pathlib import Path
+from datetime import datetime
 from ultralytics import YOLO
 
 # internal modules
@@ -27,6 +30,10 @@ class InferenceProcessor:
 
         # get root dir
         self.root_dir = _get_root_dir()
+        self.output_dir = None
+        self.video_writer = None
+        self.saved_frame_count = 0
+        self.save_frame_interval = 300 # 10s / 30 FPS
 
     def load_config(self):
 
@@ -38,6 +45,7 @@ class InferenceProcessor:
         # get model config
         self.model_cfg = self.inference_config["model"]
         self.model_type = self.model_cfg["type"]
+        self.model_path = self.model_cfg["path"]
 
         # get tracking config
         self.tracking_cfg = self.inference_config["tracking"]
@@ -87,6 +95,9 @@ class InferenceProcessor:
             # load inference config to run
             self.load_config()
 
+            # setup output dir
+            self.setup_output_dir()
+
             # load model
             self.load_model()
 
@@ -103,6 +114,14 @@ class InferenceProcessor:
             self.running = False
             if self.capture is not None:
                 self.capture.release()
+            if self.video_writer is not None:
+                self.video_writer.release()
+
+            if self.save_video:
+                self.log("INFO", "Output video saved successfully")
+            if self.save_frames:
+                self.log("INFO", f"Saved {self.saved_frame_count} frames")
+
             self.log("INFO", "Inference finished")
 
     def log(self, level, message):
@@ -207,6 +226,14 @@ class InferenceProcessor:
         self.capture = cv2.VideoCapture(source)
         if not self.capture.isOpened():
             self.log("ERROR", f"Cannot open source: {source}")
+            raise RuntimeError(f"Cannot open source: {source}")
+
+        source_fps = self.capture.get(cv2.CAP_PROP_FPS)
+        if source_fps <= 0:
+            source_fps = 30
+
+        self.save_frame_interval = int(source_fps * 10)
+        self.log("INFO", f"Frame save interval: {self.save_frame_interval} frames (~10 seconds)")
 
         # select tracker yaml file to support tracking with YOLO
         tracker_yaml = None
@@ -226,7 +253,10 @@ class InferenceProcessor:
             else:
                 tracker_yaml = "deepocsort"
 
+        video_writer_initialized = False
+
         frame_count = 0
+
         # running inference handling
         while self.running:
             ret, frame = self.capture.read()
@@ -258,12 +288,101 @@ class InferenceProcessor:
                                              verbose=False)
 
             annotated_frame = results[0].plot()
-            frame_count += 1
 
+            # output video process
+            if self.save_video and not video_writer_initialized:
+                self.output_video_writer(annotated_frame)
+                video_writer_initialized = True
+
+            if self.save_video and self.video_writer is not None:
+                self.video_writer.write(annotated_frame)
+
+            # output frame process
+            if (self.save_frames and frame_count % self.save_frame_interval == 0):
+                frame_path = self.output_dir / f"frame_{frame_count:06d}.jpg"
+                cv2.imwrite(str(frame_path), annotated_frame)
+                self.saved_frame_count += 1
+
+            # UI call back
             if self.frame_callback:
                 self.frame_callback(annotated_frame)
+
+            frame_count += 1
 
             if frame_count % 100 == 0:
                 self.log("INFO", f"Processed {frame_count} frames")
 
         self.capture.release()
+        self.log("INFO", f"Total processed frames: {frame_count}")
+
+    def setup_output_dir(self):
+
+        if not self.save_video and not self.save_frames:
+            return
+        
+        # get timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # config path of output
+        self.output_dir = Path(self.root_dir / "outputs" / "inference" / f"inference-{timestamp}")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # log output
+        self.log("INFO", f"Output directory: {self.output_dir}")
+        
+        self.export_inference_config()
+
+    def export_inference_config(self):
+
+        config_path = self.output_dir / "config.json"
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(self.inference_config, f, indent=4, ensure_ascii=False)
+
+        self.log("INFO", f"Exported config.json at: {config_path}")
+
+    def output_video_writer(self, frame):
+
+        if not self.save_video:
+            return
+        
+        height, width = frame.shape[:2]
+
+        video_path = self.output_dir / "inference_output.mp4"
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+        self.video_writer = cv2.VideoWriter(str(video_path), fourcc, 30, (width, height))
+
+        self.log("INFO", f"Video recording: {video_path}")
+
+    def log_config_summary(self):
+
+        # log title
+        self.log("INFO", "== Inference Config Summary ==")
+
+        # log source
+        self.log("INFO", f"Source: {self.source_type}")
+        
+        # log model
+        if self.model_type == "trained":
+            model_info = f'trained {self.model_cfg["path"]}'
+        else:
+            model_info = f'pretrained {self.model_cfg["version"]}{self.model_cfg["size"]}'
+        self.log("INFO", f"Model: {model_info}")
+
+        # log tracking
+        tracking_info = f'{self.tracking_cfg["tracker"]} | enabled={self.tracking_enabled}'
+        self.log("INFO", f"Tracker: {tracking_info}")
+
+        # log detection
+        self.log("INFO", f"Conf / IoU: {self.confidence} / {self.iou}")
+        self.log("INFO", f"Image Size: {self.image_size} | FP16: {self.fp16} | MaxDet: {self.max_detection}")
+
+        # log runtime
+        self.log("INFO", f"Device: {self.device}")
+
+        # log output
+        self.log("INFO", f"Output: video ={self.save_video}, frames={self.save_frames}")
+
+        # log end
+        self.log("INFO", "==============================")

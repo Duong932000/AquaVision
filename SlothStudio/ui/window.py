@@ -41,19 +41,35 @@ class InferenceLogTextbox(customtkinter.CTkFrame):
 
     def append_log(self, log_type, message):
 
+        # check user is near bottom
+        yview = self.textbox.yview()
+        auto_scroll = yview[1] > 0.95
+
         timestamp = datetime.now().strftime("%H:%M:%S")
+
         self.textbox.configure(state="normal")
+
         self.textbox.insert("end", f"[{log_type}] ", log_type)
         self.textbox.insert("end", f"[{timestamp}] ")
         self.textbox.insert("end", f"{message}\n")
-        self.textbox.see("end")
+
+        if auto_scroll:
+            self.textbox.see("end")
+
         self.textbox.configure(state="disabled")
 
     def append(self, message):
 
+        yview = self.textbox.yview()
+        auto_scroll = yview[1] > 0.95
+
         self.textbox.configure(state="normal")
+
         self.textbox.insert("end", f"{message}\n")
-        self.textbox.see("end")
+
+        if auto_scroll:
+            self.textbox.see("end")
+
         self.textbox.configure(state="disabled")
 
     def clear(self):
