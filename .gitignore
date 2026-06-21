@@ -49,3 +49,6 @@ src/aquavision.egg-info/
 
 # output inference
 outputs/
+
+# cookies
+cookies.txt

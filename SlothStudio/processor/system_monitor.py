@@ -15,7 +15,6 @@ except Exception:
 
 class SystemUsageMonitor:
     def __init__(self):
-
         self.gpu_availabel = NVIDIA_AVAILABLE
 
     def get_usage(self):

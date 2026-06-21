@@ -12,7 +12,7 @@ from CTkMessagebox import CTkMessagebox
 from tkinterdnd2 import TkinterDnD, DND_ALL
 
 # internal modules
-from config.assets import asset_resources
+from ui.assets import asset_resources
 from processor.system_monitor import SystemUsageMonitor
 from processor.inference_processor import InferenceProcessor
 
@@ -77,49 +77,57 @@ class MainWindow(DragnDropSources):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # INFERENCE DISPLAY VARIABLE -------------------------------------------------#
+        # --------------------------------------------------------------------------#
+        # INFERENCE VARIABLES ------------------------------------------------------#
+        # --------------------------------------------------------------------------#
         # inference mode
         self.inference_mode = False
 
         # inference config json
         self.inference_config = {}
 
+        # varible for optionmenu source type
+        self.source_type_var = customtkinter.StringVar(value="Youtube URL")    # variable for source option menu
+
+        # variables for source local
         self.selected_local_sources = []
         self.local_file_checkboxes = []
 
-        # widget variable
+        # variables for youtube source
         self.youtube_url_var = customtkinter.StringVar(value="")               # variable for youtube url entry
-        self.source_type_var = customtkinter.StringVar(value="Youtube URL")    # variable for source option menu
 
-        # INFERENCE CONTROL VARIABLE -------------------------------------------------#
         # variable model selection
-        self.model_selection_var = customtkinter.StringVar(value="Trained")    # variable for model selection: Trained  |  Pretrained
+        self.model_selection_var = customtkinter.StringVar(value="Trained")    # variable for model selection (Trained, Preatrained)
         self.trained_model_var = customtkinter.StringVar(value="")             # variable for trained model
         self.pretrained_version_var = customtkinter.StringVar(value="YOLO26")  # variable for pretrained version
         self.pretrained_size_var = customtkinter.StringVar(value="n")          # variable for pretrained size
 
-        # variable tracker
+        # variables for tracking
         self.enable_tracking_var = customtkinter.BooleanVar(value=True)
-        self.tracker_var = customtkinter.StringVar(value="ByteTrack")
+        self.tracker_var = customtkinter.StringVar(value="BoT-SORT")
 
-        # variable detection
+        # variable for detection
         self.confidence_var = customtkinter.DoubleVar(value=0.25)
         self.iou_var = customtkinter.DoubleVar(value=0.45)
+        self.image_size_var = customtkinter.StringVar(value="640")
+        self.fp16_enabled_var = customtkinter.BooleanVar(value=True)
+        self.max_detection_var = customtkinter.StringVar(value="300")
 
-        # varible output
+        # varible for output mode
         self.save_video_var = customtkinter.BooleanVar(value=False)
         self.save_frames_var = customtkinter.BooleanVar(value=False)
 
-        # variable runtime
-        self.device_var = customtkinter.StringVar(value="Auto")
+        # variable for runtime
+        self.device_var = customtkinter.StringVar(value="CUDA")
 
-        # processor
+        # flag of inference processor
         self.inference_processor = None
 
         # frame queue
         self.frame_queue = Queue(maxsize=1)
         self.last_frame_time = 0
 
+        # Monitoring object
         self.system_monitor = SystemUsageMonitor()
 
         # init UI
@@ -131,8 +139,9 @@ class MainWindow(DragnDropSources):
         # start core functionality
         self.GUI_CoreFunctionality_Controller()
 
-        self.after(30, self.RenderFrameLoop_Event)
+        self.after(30, self.RenderInferenceFrameLoop_Event)
         self.after(1000, self.UpdateSystemMonitor_Event)
+
     # ------------------- INIT SETUP RESOURCE ------------------- #
     # ------------------------------------------------------------#
     def GUI_InitSetupResources_Controller(self):
@@ -319,20 +328,36 @@ class MainWindow(DragnDropSources):
         self.menu_panel.grid_rowconfigure(5, weight=1)
 
         # runtime mode frame
-        self.inference_runtime_frame \
+        self.inference_runtime_mode_frame \
             = customtkinter.CTkFrame(self.menu_panel, corner_radius=10)
 
-        self.stop_runtime_button \
-            = customtkinter.CTkButton(self.inference_runtime_frame,
+        self.stop_inference_button \
+            = customtkinter.CTkButton(self.inference_runtime_mode_frame,
                                       text="Stop Inference",
                                       command=self.StopInference_Event)
-        self.stop_runtime_button.pack(fill="x", padx=10, pady=(10, 10))
+        self.stop_inference_button.pack(fill="x", padx=10, pady=(10, 10))
 
-        self.runtime_log_textbox \
-            = InferenceLogTextbox(self.inference_runtime_frame,
+        self.inference_runtime_mode_log_textbox \
+            = InferenceLogTextbox(self.inference_runtime_mode_frame,
                                   textbox_width=260,
                                   textbox_height=500)
-        self.runtime_log_textbox.pack(fill="both", expand=True, padx=5, pady=5)
+        self.inference_runtime_mode_log_textbox.pack(fill="both", expand=True, padx=5, pady=5)
+
+    def UpdateSystemMonitor_Event(self):
+
+        usage = self.system_monitor.get_usage()
+
+        self.cpu_label.configure(text=f"CPU: {usage['cpu_percent']:.1f}%")
+
+        self.ram_label.configure(text=f"RAM: "f"{usage['ram_used_gb']:.1f} / {usage['ram_total_gb']:.1f} GB")
+
+        if usage["gpu_percent"] is not None:
+            self.gpu_label.configure(text=f"GPU: {usage['gpu_percent']:.1f}%")
+            self.vram_label.configure(text=f"VRAM: {usage['gpu_memory_used_gb']:.1f} / {usage['gpu_memory_total_gb']:.1f} GB")
+        else:
+            self.gpu_label.configure(text="GPU: N/A")
+            self.vram_label.configure(text="VRAM: N/A")
+        self.after(1000,self.UpdateSystemMonitor_Event)
 
     # DISPLAY PANEL SETUP -----------------------------------------#
     def DisplayPanel_Adapter(self):
@@ -354,68 +379,20 @@ class MainWindow(DragnDropSources):
             frame.grid_columnconfigure(0, weight=1)
 
         # fullscreen inference mode
-        self.fullscreen_render_label \
+        self.fullscreen_inference_mode_label \
             = customtkinter.CTkLabel(self.display_panel, text="")
-
-    def UpdateSystemMonitor_Event(self):
-
-        usage = self.system_monitor.get_usage()
-
-        self.cpu_label.configure(
-            text=f"CPU: {usage['cpu_percent']:.1f}%"
-        )
-
-        self.ram_label.configure(
-            text=(
-                f"RAM: "
-                f"{usage['ram_used_gb']:.1f}/"
-                f"{usage['ram_total_gb']:.1f} GB"
-            )
-        )
-
-        if usage["gpu_percent"] is not None:
-
-            self.gpu_label.configure(
-                text=f"GPU: {usage['gpu_percent']:.1f}%"
-            )
-
-            self.vram_label.configure(
-                text=(
-                    f"VRAM: "
-                    f"{usage['gpu_memory_used_gb']:.1f}/"
-                    f"{usage['gpu_memory_total_gb']:.1f} GB"
-                )
-            )
-
-        else:
-
-            self.gpu_label.configure(
-                text="GPU: N/A"
-            )
-
-            self.vram_label.configure(
-                text="VRAM: N/A"
-            )
-
-        self.after(
-            1000,
-            self.UpdateSystemMonitor_Event
-        )
-
-
-
 
     # INFERENCE PANEL SETUP ---------------------------------------#
     def InferencePanel_Adapter(self):
 
-        # setup rate of inference_frame: 6-2-2
+        # setup rate of inference_frame
         self.inference_frame.grid_columnconfigure(0, weight=9)
         self.inference_frame.grid_columnconfigure(1, weight=1)
         self.inference_frame.grid_columnconfigure(2, weight=1)
         self.inference_frame.grid_rowconfigure(0, weight=1)
 
         # Create Subframes
-        # video frame
+        # inference display frame
         self.inference_display_frame \
             = customtkinter.CTkFrame(self.inference_frame, corner_radius=10)
         self.inference_display_frame.grid(row=0, column=0, padx=(10, 5), pady=5, sticky="snew")
@@ -436,32 +413,72 @@ class MainWindow(DragnDropSources):
         self.inference_control_frame.grid_rowconfigure(0, weight=1)
         self.inference_control_frame.grid_columnconfigure(0, weight=1)
 
-        # Calling widget functions
-        self.InferenceDisplay_WidgetConfigure()
+        # call infernence source input function
+        self.InferenceSourceInput_WidgetConfigure()
+
+        # call infernece log function
         self.InferenceLog_WidgetConfigure()
+
+        # call inference control function
         self.InferenceControl_WidgetConfigure()
 
-    def InferenceDisplay_WidgetConfigure(self):
+    # Inference Source Input widgets setup
+    def InferenceSourceInput_WidgetConfigure(self):
 
         # ----------------------------------------------------------------------------#
         # Common frame for display inference
         # ----------------------------------------------------------------------------#
         # Display panel label
-        self.display_panel_label \
+        self.inference_source_input_panel \
             = customtkinter.CTkLabel(self.inference_display_frame,
-                                     text="✓ Display Panel",
+                                     text="✓ Source Input Panel",
                                      font=customtkinter.CTkFont(size=18, weight="bold"))
-        self.display_panel_label.pack(anchor="w", padx=5, pady=(10, 5))
+        self.inference_source_input_panel.pack(anchor="w", padx=5, pady=(10, 5))
 
         # source type options
         self.source_type_optionmenu \
             = customtkinter.CTkOptionMenu(self.inference_display_frame,
-                                          width=150,
+                                          width=200,
                                           height=30,
                                           variable=self.source_type_var,
                                           values=["Youtube URL", "Local Files"],
-                                          command=self.SourceTypeChanged_Event)
+                                          command=self.UpdateUISourceTypeChanged_Event)
         self.source_type_optionmenu.pack(anchor="w", padx=5, pady=(10, 5))
+
+        # ----------------------------------------------------------------------------#
+        # Youtube widget configuration
+        # ----------------------------------------------------------------------------#
+        # youtube message label
+        self.youtube_message_label \
+            = customtkinter.CTkLabel(self.inference_display_frame,
+                                     text="▼ Youtube URL: Paste a link to the content you want to inference ▼",
+                                     text_color="#90EE90",
+                                     font=customtkinter.CTkFont(size=20, weight="bold"))
+
+        # youtube entry
+        self.youtube_entry \
+            = customtkinter.CTkEntry(self.inference_display_frame,
+                                     textvariable=self.youtube_url_var,
+                                     width=690,
+                                     height=50,
+                                     placeholder_text="https://www.youtube.com/watch?v=...")
+
+        # clear button
+        self.clear_url_button \
+            = customtkinter.CTkButton(self.inference_display_frame,
+                                      width=25,
+                                      height=25,
+                                      text="Clear URL",
+                                      command=self.ClearURL_Event,
+                                      font=customtkinter.CTkFont(size=14))
+
+        self.submit_youtube_url_button \
+            = customtkinter.CTkButton(self.inference_display_frame,
+                                      width=50,
+                                      height=25,
+                                      text="Submit URL",
+                                      command=self.SubmitYoutubeSources_Event,
+                                      font=customtkinter.CTkFont(size=28))
 
         # ----------------------------------------------------------------------------#
         # Local widget configuration
@@ -514,59 +531,30 @@ class MainWindow(DragnDropSources):
             = customtkinter.CTkScrollableFrame(self.inference_display_frame,
                                                width=760, height=390,
                                                border_color="#90EE90")
-
-        # ----------------------------------------------------------------------------#
-        # Youtube widget configuration
-        # ----------------------------------------------------------------------------#
-        # youtube message label
-        self.youtube_label \
-            = customtkinter.CTkLabel(self.inference_display_frame,
-                                     text="▼ Youtube URL: Paste a link to the content you want to inference ▼",
-                                     text_color="#90EE90",
-                                     font=customtkinter.CTkFont(size=20, weight="bold"))
-        # clear button
-        self.clear_url_button \
-            = customtkinter.CTkButton(self.inference_display_frame,
-                                      width=25,
-                                      height=25,
-                                      text="Clear URL",
-                                      command=self.ClearURL_Event,
-                                      font=customtkinter.CTkFont(size=14))
         
-        # youtube entry
-        self.youtube_entry \
-            = customtkinter.CTkEntry(self.inference_display_frame,
-                                     textvariable=self.youtube_url_var,
-                                     width=690,
-                                     height=50,
-                                     placeholder_text="https://www.youtube.com/watch?v=...")
+        # Init 
+        self.UpdateUISourceTypeChanged_Event(self.source_type_var.get())
 
-        self.submit_youtube_url_button \
-            = customtkinter.CTkButton(self.inference_display_frame,
-                                      width=50,
-                                      height=25,
-                                      text="Submit URL",
-                                      command=self.SubmitYoutubeSources_Event,
-                                      font=customtkinter.CTkFont(size=28))
-
-        self.SourceTypeChanged_Event(self.source_type_var.get())
-
-    def SourceTypeChanged_Event(self, source_type):
+    def UpdateUISourceTypeChanged_Event(self, source_type):
 
         # Hide all widgets first
+
+        # youtube source widgets
+        self.youtube_message_label.pack_forget()
+        self.youtube_entry.pack_forget()
+        self.clear_url_button.pack_forget()
+        self.submit_youtube_url_button.pack_forget()
+
+        # local source widgets
         self.upload_files_label.pack_forget()
         self.drop_zone_entry.pack_forget()
         self.or_label.pack_forget()
         self.browse_files_button.pack_forget()
-        self.youtube_label.pack_forget()
-        self.youtube_entry.pack_forget()
-        self.clear_url_button.pack_forget()
-        self.submit_youtube_url_button.pack_forget()
         self.source_files_list_label.pack_forget()
         self.source_list_checkbox.pack_forget()
 
         if source_type == "Youtube URL":
-            self.youtube_label.pack(anchor="center", padx=5, pady=(50, 10))
+            self.youtube_message_label.pack(anchor="center", padx=5, pady=(50, 10))
             self.youtube_entry.pack(anchor="center", pady=(10, 10))
             self.clear_url_button.pack(anchor="w", padx=80, pady=(10, 10))
             self.submit_youtube_url_button.pack(anchor="center", pady=(50, 10))
@@ -577,6 +565,24 @@ class MainWindow(DragnDropSources):
             self.browse_files_button.pack(anchor="center", pady=(5, 10))
             self.source_files_list_label.pack(anchor="center", pady=(50, 10))
             self.source_list_checkbox.pack(anchor="center", padx=5, pady=10)
+
+    def SubmitYoutubeSources_Event(self):
+
+        # get youtube url from youtube url var entry
+        youtube_url = self.youtube_url_var.get().strip()
+
+        if not youtube_url:
+            self.AppendInferenceLog_Event("ERROR", "Please enter a youtube URL")
+            return
+
+        self.AppendInferenceLog_Event("INFO", f"Youtube URL selected: {youtube_url}")
+
+    def ClearURL_Event(self):
+        
+        # reset youtube url var to empty
+        self.youtube_url_var.set("")
+
+        self.AppendInferenceLog_Event("INFO", "Youtube URL cleared")
 
     def SourcesDrop_Event(self, event):
 
@@ -673,25 +679,11 @@ class MainWindow(DragnDropSources):
         
         self.selected_local_sources = selected_files
 
-        config = self.BuildInferenceConfig_Event()
+        self.BuildInferenceConfig_Event()
 
         self.AppendInferenceLog_Event("INFO", f"Local source: {len(selected_files)} files submitted")
 
-    def SubmitYoutubeSources_Event(self):
-
-        youtube_url = self.youtube_url_var.get().strip()
-
-        if not youtube_url:
-            self.AppendInferenceLog_Event("ERROR", "Please enter a youtube URL")
-            return
-
-        self.AppendInferenceLog_Event("INFO", f"Youtube URL selected: {youtube_url}")
-
-    def ClearURL_Event(self):
-
-        self.youtube_url_var.set("")
-        self.AppendInferenceLog_Event("INFO", "Youtube URL cleared")
-
+    # Inference Log widgets setup
     def InferenceLog_WidgetConfigure(self):
         
         # Inference log label
@@ -702,12 +694,12 @@ class MainWindow(DragnDropSources):
         self.inference_log_label.pack(anchor="w", padx=15, pady=(10, 5))
 
         # Clear Log button
-        self.clear_log_button \
+        self.inference_clearn_log_button \
             = customtkinter.CTkButton(self.inference_log_frame,
                                       text="Clear log",
                                       command=self.ClearInferenceLog_Event,
-                                      font=customtkinter.CTkFont(size=14, slant="italic"))
-        self.clear_log_button.pack(anchor="w", padx=15, pady=(5, 10))
+                                      font=customtkinter.CTkFont(size=16, slant="italic"))
+        self.inference_clearn_log_button.pack(anchor="w", padx=15, pady=(5, 10))
 
         # Inference Progress textbox
         self.inference_log_textbox \
@@ -719,12 +711,13 @@ class MainWindow(DragnDropSources):
         self.inference_log_textbox.append_log(log_type, message)
 
         if self.inference_mode:
-            self.runtime_log_textbox.append_log(log_type, message)
+            self.inference_runtime_mode_log_textbox.append_log(log_type, message)
 
     def ClearInferenceLog_Event(self):
 
         self.inference_log_textbox.clear()
 
+    # Inference Control widgets setup
     def InferenceControl_WidgetConfigure(self):
 
         # tabview configure
@@ -739,57 +732,58 @@ class MainWindow(DragnDropSources):
         #                                   FRAME CONFIGURE                             #
         #-------------------------------------------------------------------------------#
         # frame configure
-        self.control_scroll_frame \
+        self.inference_control_scroll_frame \
             = customtkinter.CTkScrollableFrame(self.inference_control_tab, corner_radius=10)
-        self.control_scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.inference_control_scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
 
         #-------------------------------------------------------------------------------#
         #                                  MODEL CONFIGURE                              #
         #-------------------------------------------------------------------------------#
-        # Model label
+        # model selection label
         self.model_selection_label \
-            = customtkinter.CTkLabel(self.control_scroll_frame,
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
                                      text="✓ Model Selection:",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
         self.model_selection_label.pack(anchor="w", padx=10, pady=(15, 5))
  
-        # model frame
+        # model frame (able to show Trained Model and Pretrained Model widgets when changing radio button type)
         self.model_selection_frame \
-            = customtkinter.CTkFrame(self.control_scroll_frame, fg_color="transparent")
+            = customtkinter.CTkFrame(self.inference_control_scroll_frame, fg_color="transparent")
         self.model_selection_frame.pack(fill="x", padx=10, pady=(0, 10))
 
         # Trained model radio button
-        self.trained_radio \
+        self.trained_model_radio \
             = customtkinter.CTkRadioButton(self.model_selection_frame,
                                            text="Trained Model",
                                            variable=self.model_selection_var,
                                            value="Trained",
-                                           command=self.ModelSourceChanged_Event)
-        self.trained_radio.pack(anchor="w", padx=10, pady=(5, 5))
+                                           command=self.ModelSelectionUIChanged_Event)
+        self.trained_model_radio.pack(anchor="w", padx=10, pady=(5, 5))
 
         # Pre-Trained model radio button
-        self.pretrained_radio \
+        self.pretrained_model_radio \
             = customtkinter.CTkRadioButton(self.model_selection_frame,
                                            text="Pretrained Model",
                                            variable=self.model_selection_var,
                                            value="Pretrained",
-                                           command=self.ModelSourceChanged_Event)
-        self.pretrained_radio.pack(anchor="w", padx=10, pady=(5, 10))
+                                           command=self.ModelSelectionUIChanged_Event)
+        self.pretrained_model_radio.pack(anchor="w", padx=10, pady=(5, 10))
 
         # trained model frame
-        self.trained_model_frame = customtkinter.CTkFrame(self.model_selection_frame, fg_color="transparent")
+        self.trained_model_frame \
+            = customtkinter.CTkFrame(self.model_selection_frame, fg_color="transparent")
         self.trained_model_frame.pack(fill="x", pady=5)
 
         # browse trained model button
         self.browse_model_button \
             = customtkinter.CTkButton(self.trained_model_frame,
+                                      text="Browse Trained Model",
+                                      command=self.BrowseTrainedModel_Event,
                                       width=40,
                                       height=30,
-                                      text="Browse Model Path",
-                                      command=self.BrowseModel_Event,
                                       font=customtkinter.CTkFont(size=14))
-        self.browse_model_button.pack(anchor="w", padx=5, pady=10)
+        self.browse_model_button.pack(anchor="w", padx=5, pady=5)
 
         # pretrained model frame
         self.pretrained_model_frame \
@@ -813,39 +807,39 @@ class MainWindow(DragnDropSources):
         #-------------------------------------------------------------------------------#
         # Tracking label
         self.tracker_label \
-            = customtkinter.CTkLabel(self.control_scroll_frame,
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
                                      text="✓ MOT Tracker:",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
-        self.tracker_label.pack(anchor="w", padx=10, pady=(15, 5))
+        self.tracker_label.pack(anchor="w", padx=10, pady=(0, 5))
 
-        # Tracking checkbox
+        # Tracking checkbox (default is True, follow define of self.enable_tracking_var)
         self.enable_tracking_checkbox \
-            = customtkinter.CTkCheckBox(self.control_scroll_frame,
+            = customtkinter.CTkCheckBox(self.inference_control_scroll_frame,
                                         text="Enable Tracking",
                                         variable=self.enable_tracking_var)
         self.enable_tracking_checkbox.select()
         self.enable_tracking_checkbox.pack(anchor="w", padx=10, pady=5)
 
-        # Tracker combobox
+        # Tracker combobox (default is BoT-SORT)
         self.tracker_combobox \
-            = customtkinter.CTkComboBox(self.control_scroll_frame,
+            = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                         variable=self.tracker_var,
-                                        values=["ByteTrack", "BoT-SORT"])
-        self.tracker_combobox.set("ByteTrack")
+                                        values=["BoT-SORT", "ByteTrack", "DeepSORT", "StrongSORT", "OC-SORT", "DeepOCSORT"])
+        self.tracker_combobox.set("BoT-SORT")
         self.tracker_combobox.pack(fill="x", padx=10, pady=10)
 
         #-------------------------------------------------------------------------------#
         #                       DETECTION PARAMETERS CONFIGURE                          #
         #-------------------------------------------------------------------------------#
         # detection parameters label
-        self.parameter_label \
-            = customtkinter.CTkLabel(self.control_scroll_frame,
+        self.detection_parameters_label \
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
                                     text="✓ Detection Parameters",
                                     font=customtkinter.CTkFont(size=20, weight="bold"))
-        self.parameter_label.pack(anchor="w", padx=10, pady=(15, 5))
+        self.detection_parameters_label.pack(anchor="w", padx=10, pady=(5, 5))
 
         self.confidence_frame \
-            = customtkinter.CTkFrame(self.control_scroll_frame, fg_color="transparent")
+            = customtkinter.CTkFrame(self.inference_control_scroll_frame, fg_color="transparent")
         self.confidence_frame.pack(fill="x", padx=10, pady=(0, 5))
 
         # Confidence threshold label
@@ -861,21 +855,21 @@ class MainWindow(DragnDropSources):
 
         # Confidence slider
         self.confidence_slider \
-            = customtkinter.CTkSlider(self.control_scroll_frame,
+            = customtkinter.CTkSlider(self.inference_control_scroll_frame,
                                       variable=self.confidence_var,
                                       command=self.ConfidenceSlider_Event,
                                       from_=0.05,
                                       to=1.0)
         self.confidence_slider.set(0.25)
-        self.confidence_slider.pack(fill="x", padx=10, pady=5)
+        self.confidence_slider.pack(fill="x", padx=10, pady=0)
 
-        self.iou_frame = customtkinter.CTkFrame(self.control_scroll_frame, fg_color="transparent")
+        self.iou_frame = customtkinter.CTkFrame(self.inference_control_scroll_frame, fg_color="transparent")
         self.iou_frame.pack(fill="x", padx=10, pady=(0, 5))
 
         # IoU label
         self.iou_label \
             = customtkinter.CTkLabel(self.iou_frame,
-                                     text="NMS IOU Threshold")
+                                     text="NMS IoU Threshold")
         self.iou_label.pack(side="left")
 
         self.iou_value_label \
@@ -884,73 +878,127 @@ class MainWindow(DragnDropSources):
 
         # IoU slider
         self.iou_slider \
-            = customtkinter.CTkSlider(self.control_scroll_frame,
+            = customtkinter.CTkSlider(self.inference_control_scroll_frame,
                                       variable=self.iou_var,
                                       command=self.IoUSlider_Event,
                                       from_=0.1, to=1.0)
         self.iou_slider.set(0.45)
-        self.iou_slider.pack(fill="x", padx=10, pady=10)
+        self.iou_slider.pack(fill="x", padx=10, pady=0)
+
+        # image size label
+        self.image_size_label \
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
+                                     text="Image Size")
+        self.image_size_label.pack(anchor="w", padx=10, pady=(0, 5))
+
+        # image size combobox
+        self.image_size_combobox \
+            = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
+                                        variable=self.image_size_var,
+                                        width=300,
+                                        values=["640", "960", "1280"])
+        self.image_size_combobox.set("640")
+        self.image_size_combobox.pack(anchor="w", padx=10, pady=(5, 5))
+
+        # FP16 enabled checkbox
+        self.fp16_enabled_checkbox \
+            = customtkinter.CTkCheckBox(self.inference_control_scroll_frame,
+                                        text="Enable FP16 (CUDA only)",
+                                        variable=self.fp16_enabled_var)
+        self.fp16_enabled_checkbox.pack(anchor="w", padx=10, pady=(10, 5))
+
+        # max detection label
+        self.max_detection_label \
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
+                                     text="Max Detection")
+        self.max_detection_label.pack(anchor="w", padx=10, pady=(5, 5))
+
+        # max detection combobox
+        self.max_detection_combobox \
+            = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
+                                        variable=self.max_detection_var,
+                                        width=300,
+                                        values=["100", "300", "500", "1000"])
+        self.max_detection_combobox.set("100")
+        self.max_detection_combobox.pack(anchor="w", padx=10, pady=(5, 5))
 
         # Output Options label
         self.output_options_label \
-            = customtkinter.CTkLabel(self.control_scroll_frame,
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
                                      text="✓ Output Options",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
         self.output_options_label.pack(anchor="w", padx=10, pady=(15, 5))
     
         # Save video checkbox
         self.save_video_checkbox = \
-            customtkinter.CTkCheckBox(self.control_scroll_frame,
+            customtkinter.CTkCheckBox(self.inference_control_scroll_frame,
                                      text="Save Output Video/Image",
                                      variable=self.save_video_var)
         self.save_video_checkbox.pack(anchor="w", padx=10, pady=5)
 
         # Save Frame checkbox
         self.save_frames_checkbox = \
-            customtkinter.CTkCheckBox(self.control_scroll_frame,
+            customtkinter.CTkCheckBox(self.inference_control_scroll_frame,
                                       text="Save Detection Frames",
                                       variable=self.save_frames_var)
         self.save_frames_checkbox.pack(anchor="w", padx=10, pady=5)
 
         # Runtime label
         self.runtime_label \
-            = customtkinter.CTkLabel(self.control_scroll_frame,
+            = customtkinter.CTkLabel(self.inference_control_scroll_frame,
                                      text="✓ Runtime",
                                      font=customtkinter.CTkFont(size=20, weight="bold"))
-        self.runtime_label.pack(anchor="w", padx=10, pady=(15, 5))
+        self.runtime_label.pack(anchor="w", padx=10, pady=(5, 5))
         
         # device combobox
         self.device_combobox = \
-            customtkinter.CTkComboBox(self.control_scroll_frame,
+            customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                       variable=self.device_var,
-                                      values=[
-                                          "Auto",
-                                          "CPU",
-                                          "CUDA"
-                                      ])
-        self.device_combobox.set("Auto")
+                                      values=["Auto", "CPU", "CUDA"])
+        self.device_combobox.set("CUDA")
         self.device_combobox.pack(fill="x", padx=10, pady=5)
 
         # Start inference button
         self.start_button \
-            = customtkinter.CTkButton(self.control_scroll_frame,
+            = customtkinter.CTkButton(self.inference_control_scroll_frame,
                                       text="Start Inference",
                                       command=self.StartInference_Event,
                                       height=40,
                                       font=customtkinter.CTkFont(size=14))
-        self.start_button.pack(fill="x", padx=10, pady=(25, 10))
+        self.start_button.pack(fill="x", padx=10, pady=(20, 10))
 
-        # Stop inference button
-        # self.stop_button \
-        #     = customtkinter.CTkButton(self.control_scroll_frame,
-        #                               text="Stop Inference",
-        #                               command=self.StopInference_Event,
-        #                               height=40,
-        #                               fg_color="darkred",
-        #                               font=customtkinter.CTkFont(size=14))
-        # self.stop_button.pack(fill="x", padx=10, pady=(5, 20))
+        self.ModelSelectionUIChanged_Event()
 
-        self.ModelSourceChanged_Event()
+    def ModelSelectionUIChanged_Event(self):
+
+        if self.model_selection_var.get() == "Trained":
+            self.pretrained_model_frame.pack_forget()
+            self.trained_model_frame.pack(fill="x", pady=5)
+        else:
+            self.trained_model_frame.pack_forget()
+            self.pretrained_model_frame.pack(fill="x", pady=5)
+
+    def BrowseTrainedModel_Event(self):
+
+        filepath = filedialog.askopenfilename(title="Select YOLO Model",
+                                              filetypes=[("PyTorch Model", "*.pt")])
+
+        if not filepath:
+            self.AppendInferenceLog_Event("WARNING",
+                                          f"Model path not foun. Please enter model to continue!")
+            return
+
+        self.trained_model_var.set(filepath)
+
+        self.AppendInferenceLog_Event("INFO", f"Model selected: {filepath}")
+
+    def ConfidenceSlider_Event(self, value):
+
+        self.confidence_value_label.configure(text=f"{value:.2f}")
+
+    def IoUSlider_Event(self, value):
+
+        self.iou_value_label.configure(text=f"{value:.2f}")
 
     def BuildInferenceConfig_Event(self):
 
@@ -991,7 +1039,10 @@ class MainWindow(DragnDropSources):
         # detection process
         config["detection"] = {
             "confidence": round(self.confidence_var.get(), 2),
-            "iou": round(self.iou_var.get(), 2)
+            "iou": round(self.iou_var.get(), 2),
+            "image_size": int(self.image_size_var.get()),
+            "fp16": self.fp16_enabled_var.get(),
+            "max_detection": int(self.max_detection_var.get())
         }
 
         # output process
@@ -1009,59 +1060,39 @@ class MainWindow(DragnDropSources):
 
         return config
 
-    def ModelSourceChanged_Event(self):
+    def EnterInferenceMode_Event(self):
 
-        if self.model_selection_var.get() == "Trained":
-            self.pretrained_model_frame.pack_forget()
-            self.trained_model_frame.pack(fill="x", pady=5)
-        else:
-            self.trained_model_frame.pack_forget()
-            self.pretrained_model_frame.pack(fill="x", pady=5)
+        self.inference_mode = True
 
-    def BrowseModel_Event(self):
+        # hide config panels
+        self.inference_log_frame.grid_remove()
+        self.inference_control_frame.grid_remove()
 
-        filepath = filedialog.askopenfilename(title="Select YOLO Model",
-                                              filetypes=[("PyTorch Model", "*.pt")])
+        # fullscreen video
+        self.fullscreen_inference_mode_label.place(relx=0, rely=0, relwidth=1, relheight=1)
 
-        if not filepath:
-            self.AppendInferenceLog_Event("WARNING",
-                                          f"Model path not foun. Please enter model to continue!")
-            return
+        self.fullscreen_inference_mode_label.lift()
 
-        self.trained_model_var.set(filepath)
+        # runtime menu
+        self.inference_runtime_mode_frame.grid(row=5, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.AppendInferenceLog_Event("INFO", f"Model selected: {filepath}")
+        self.inference_runtime_mode_log_textbox.clear()
 
-    def ConfidenceSlider_Event(self, value):
+    def ExitInferenceMode_Event(self):
 
-        self.confidence_value_label.configure(text=f"{value:.2f}")
+        self.inference_mode = False
 
-    def IoUSlider_Event(self, value):
+        self.fullscreen_inference_mode_label.place_forget()
 
-        self.iou_value_label.configure(text=f"{value:.2f}")
+        self.inference_runtime_mode_frame.grid_remove()
 
-    def StartInference_Event(self):
+        self.inference_log_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
 
-        # build latest config
-        self.BuildInferenceConfig_Event()
+        self.inference_control_frame.grid(row=0, column=2, padx=5, pady=0, sticky="nsew")
 
-        # already running?
-        if self.inference_processor is not None and self.inference_processor.running:
-            self.AppendInferenceLog_Event("WARNING", "Inference is already running")
-            return
+        self.UpdateUISourceTypeChanged_Event(self.source_type_var.get())
 
-        self.EnterInferenceMode_Event()
-        self.AppendInferenceLog_Event("INFO", "Starting inference model ...")
-
-        self.inference_processor \
-            = InferenceProcessor(config=self.inference_config,
-                                frame_callback=self.EnqueueFrame_Event,
-                                log_callback=self.AppendInferenceLog_Event)
-        self.inference_processor.start()
-
-        self.AppendInferenceLog_Event("INFO", "Inference started")
-
-    def EnqueueFrame_Event(self, frame):
+    def EnqueueInferenceFrame_Event(self, frame):
 
         now = time.time()
         if now - self.last_frame_time < 0.03:  # ~30 FPS cap
@@ -1074,6 +1105,27 @@ class MainWindow(DragnDropSources):
 
         self.frame_queue.put_nowait(frame)
 
+    def StartInference_Event(self):
+
+        # build latest config
+        self.BuildInferenceConfig_Event()
+
+        # already running or not?
+        if self.inference_processor is not None and self.inference_processor.running:
+            self.AppendInferenceLog_Event("WARNING", "Inference is already running")
+            return
+
+        self.EnterInferenceMode_Event()
+        self.AppendInferenceLog_Event("INFO", "Starting inference model")
+
+        self.inference_processor \
+            = InferenceProcessor(config=self.inference_config,
+                                frame_callback=self.EnqueueInferenceFrame_Event,
+                                log_callback=self.AppendInferenceLog_Event)
+        self.inference_processor.start()
+
+        self.AppendInferenceLog_Event("INFO", "Inference started")
+
     def StopInference_Event(self):
 
         if self.inference_processor:
@@ -1083,13 +1135,22 @@ class MainWindow(DragnDropSources):
 
         self.AppendInferenceLog_Event("INFO", "Inference stopped")
 
+    def RenderInferenceFrameLoop_Event(self):
+
+        try:
+            frame = self.frame_queue.get(timeout=0.05)
+            self.UpdateInferenceFrameUI_Event(frame)
+        except Empty:
+            pass
+        self.after(15, self.RenderInferenceFrameLoop_Event)
+
     def UpdateInferenceFrameUI_Event(self, frame):
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         frame_h, frame_w = rgb.shape[:2]
 
-        target = self.fullscreen_render_label
+        target = self.fullscreen_inference_mode_label
 
         width = target.winfo_width()
         height = target.winfo_height()
@@ -1117,47 +1178,6 @@ class MainWindow(DragnDropSources):
 
         target.configure(image=photo)
         target.image = photo
-
-    def RenderFrameLoop_Event(self):
-
-        try:
-            frame = self.frame_queue.get(timeout=0.05)
-            self.UpdateInferenceFrameUI_Event(frame)
-        except Empty:
-            pass
-        self.after(15, self.RenderFrameLoop_Event)
-
-    def EnterInferenceMode_Event(self):
-
-        self.inference_mode = True
-
-        # hide config panels
-        self.inference_log_frame.grid_remove()
-        self.inference_control_frame.grid_remove()
-
-        # fullscreen video
-        self.fullscreen_render_label.place(relx=0, rely=0, relwidth=1, relheight=1)
-
-        self.fullscreen_render_label.lift()
-
-        # runtime menu
-        self.inference_runtime_frame.grid(row=5, column=0, padx=10, pady=10, sticky="nsew")
-
-        self.runtime_log_textbox.clear()
-
-    def ExitInferenceMode_Event(self):
-
-        self.inference_mode = False
-
-        self.fullscreen_render_label.place_forget()
-
-        self.inference_runtime_frame.grid_remove()
-
-        self.inference_log_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
-
-        self.inference_control_frame.grid(row=0, column=2, padx=5, pady=0, sticky="nsew")
-
-        self.SourceTypeChanged_Event(self.source_type_var.get())
 
     # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
