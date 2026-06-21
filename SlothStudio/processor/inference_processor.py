@@ -45,7 +45,6 @@ class InferenceProcessor:
         # get model config
         self.model_cfg = self.inference_config["model"]
         self.model_type = self.model_cfg["type"]
-        self.model_path = self.model_cfg["path"]
 
         # get tracking config
         self.tracking_cfg = self.inference_config["tracking"]
@@ -84,8 +83,8 @@ class InferenceProcessor:
 
         self.running = False
 
-        if self.capture is not None:
-            self.capture.release()
+        # if self.capture is not None:
+        #     self.capture.release()
 
         self.log("WARNING", "Inference stopped by user")
 
@@ -109,6 +108,7 @@ class InferenceProcessor:
 
         except Exception as e:
             self.log("ERROR", str(e))
+            raise RuntimeError(f"Error: {e}")
 
         finally:
             self.running = False
@@ -116,11 +116,7 @@ class InferenceProcessor:
                 self.capture.release()
             if self.video_writer is not None:
                 self.video_writer.release()
-
-            if self.save_video:
-                self.log("INFO", "Output video saved successfully")
-            if self.save_frames:
-                self.log("INFO", f"Saved {self.saved_frame_count} frames")
+                self.video_writer = None
 
             self.log("INFO", "Inference finished")
 
@@ -132,7 +128,7 @@ class InferenceProcessor:
     def load_model(self):
 
         # trained model
-        if self.model_type == "trained":                               # trained model is local file
+        if self.model_type == "trained": # trained model is local file
             model_path = self.model_cfg["path"]
             if not os.path.exists(model_path):
                 self.log("ERROR", f"Model not found at: {model_path}")
@@ -153,7 +149,7 @@ class InferenceProcessor:
 
         model_path = os.path.join(model_dir, model_name)
         if os.path.exists(model_path):
-            self.log(f"INFO", "Pretrained model found locally: {model_path}")
+            self.log(f"INFO", f"Pretrained model found locally: {model_path}")
             return YOLO(model_path)
         
         self.log("INFO", f"Downloading pretrained model: {model_name}")
@@ -187,6 +183,8 @@ class InferenceProcessor:
                 "noplaylist": True,
                 "extract_flat": False,
             }
+            
+            # Append cookie file
             if cookies_path:
                 ydl_opts["cookiesfile"] = cookies_path
             else:
