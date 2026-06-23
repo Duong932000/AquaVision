@@ -21,7 +21,7 @@ customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("green")
 
 
-class InferenceLogTextbox(customtkinter.CTkFrame):
+class LogTextbox(customtkinter.CTkFrame):
     def __init__(self, master, textbox_width=310, textbox_height=220, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         
@@ -145,6 +145,34 @@ class MainWindow(DragnDropSources):
 
         # Monitoring object
         self.system_monitor = SystemUsageMonitor()
+
+        # --------------------------------------------------------------------------#
+        # TRAINING VARIABLES -------------------------------------------------------#
+        # --------------------------------------------------------------------------#
+        self.training_config = {}
+        self.training_processor = None
+
+        # variable for training dataset
+        self.dataset_yaml_var = customtkinter.StringVar(value="")
+        self.training_project_var = customtkinter.StringVar(value="")
+        
+        # variable for models
+        self.training_model_type_var = customtkinter.StringVar(value="Pretrained")
+        self.training_model_path_var = customtkinter.StringVar(value="")
+        self.training_pretrained_version_var = customtkinter.StringVar(value="YOLO26")
+        self.training_pretrained_size_var = customtkinter.StringVar(value="m")
+
+        # variable for hyperparameters
+        self.epochs_var = customtkinter.StringVar(value="100")
+        self.batch_size_var = customtkinter.StringVar(value="16")
+        self.train_image_size_var = customtkinter.StringVar(value="640")
+        self.train_workers_var = customtkinter.StringVar(value="8")
+        self.train_device_var = customtkinter.StringVar(value="CUDA")
+        self.train_amp_var = customtkinter.BooleanVar(value=True)
+
+        # variable for validation
+        self.run_validation_var = customtkinter.BooleanVar(value=True)
+        self.show_result_validation_var = customtkinter.BooleanVar(value=True)
 
         # init UI
         self.GUI_InitSetupResources_Controller()
@@ -354,9 +382,9 @@ class MainWindow(DragnDropSources):
         self.stop_inference_button.pack(fill="x", padx=10, pady=(10, 10))
 
         self.inference_runtime_mode_log_textbox \
-            = InferenceLogTextbox(self.inference_runtime_mode_frame,
-                                  textbox_width=260,
-                                  textbox_height=500)
+            = LogTextbox(self.inference_runtime_mode_frame,
+                         textbox_width=260,
+                         textbox_height=500)
         self.inference_runtime_mode_log_textbox.pack(fill="both", expand=True, padx=5, pady=5)
 
     def UpdateSystemMonitor_Event(self):
@@ -383,14 +411,14 @@ class MainWindow(DragnDropSources):
             = customtkinter.CTkFrame(self.display_panel, corner_radius=10, fg_color="transparent")
 
         # train frame
-        self.train_frame \
+        self.training_frame \
             = customtkinter.CTkFrame(self.display_panel, corner_radius=10, fg_color="transparent")
 
         # dataset frame
         self.dataset_frame \
             = customtkinter.CTkFrame(self.display_panel, corner_radius=10, fg_color="transparent")
 
-        for frame in (self.inference_frame, self.train_frame, self.dataset_frame):
+        for frame in (self.inference_frame, self.training_frame, self.dataset_frame):
             frame.grid_rowconfigure(0, weight=1)
             frame.grid_columnconfigure(0, weight=1)
 
@@ -430,16 +458,16 @@ class MainWindow(DragnDropSources):
         self.inference_control_frame.grid_columnconfigure(0, weight=1)
 
         # call infernence source input function
-        self.InferenceSourceInput_WidgetConfigure()
+        self.InferenceSourceInput_WidgetsConfigure()
 
         # call infernece log function
-        self.InferenceLog_WidgetConfigure()
+        self.InferenceLog_WidgetsConfigure()
 
         # call inference control function
-        self.InferenceControl_WidgetConfigure()
+        self.InferenceControl_WidgetsConfigure()
 
     # Inference Source Input widgets setup
-    def InferenceSourceInput_WidgetConfigure(self):
+    def InferenceSourceInput_WidgetsConfigure(self):
 
         # ----------------------------------------------------------------------------#
         # Common frame for display inference
@@ -700,7 +728,7 @@ class MainWindow(DragnDropSources):
         self.AppendInferenceLog_Event("INFO", f"Local source: {len(selected_files)} files submitted")
 
     # Inference Log widgets setup
-    def InferenceLog_WidgetConfigure(self):
+    def InferenceLog_WidgetsConfigure(self):
         
         # Inference log label
         self.inference_log_label \
@@ -719,7 +747,7 @@ class MainWindow(DragnDropSources):
 
         # Inference Progress textbox
         self.inference_log_textbox \
-            = InferenceLogTextbox(self.inference_log_frame)
+            = LogTextbox(self.inference_log_frame)
         self.inference_log_textbox.pack(fill="both", expand=True, padx=10, pady=(10, 10))
 
     def AppendInferenceLog_Event(self, log_type, message):
@@ -734,7 +762,7 @@ class MainWindow(DragnDropSources):
         self.inference_log_textbox.clear()
 
     # Inference Control widgets setup
-    def InferenceControl_WidgetConfigure(self):
+    def InferenceControl_WidgetsConfigure(self):
 
         # tabview configure
         self.inference_control_tabview = customtkinter.CTkTabview(self.inference_control_frame)
@@ -840,7 +868,12 @@ class MainWindow(DragnDropSources):
         self.tracker_combobox \
             = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                         variable=self.tracker_var,
-                                        values=["BoT-SORT", "ByteTrack", "DeepSORT", "StrongSORT", "OC-SORT", "DeepOCSORT"])
+                                        values=["BoT-SORT",
+                                                "ByteTrack",
+                                                "Deep OC-SORT",
+                                                "OC-SORT",
+                                                "FastTracker",
+                                                "TrackTrack"])
         self.tracker_combobox.set("BoT-SORT")
         self.tracker_combobox.pack(fill="x", padx=10, pady=10)
 
@@ -1198,7 +1231,206 @@ class MainWindow(DragnDropSources):
     # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
 
+        # setup rate of training_frame
+        self.training_frame.grid_columnconfigure(0, weight=1)
+        # configuration
+        self.training_frame.grid_columnconfigure(0, weight=4)
+        # button
+        self.training_frame.grid_columnconfigure(1, weight=0)
+        # logs
+        self.training_frame.grid_columnconfigure(0, weight=2)
+
+        # training configuration frame
+        self.training_configuration_frame = customtkinter.CTkFrame(self.training_frame)
+        self.training_configuration_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+        self.training_configuration_frame.grid_rowconfigure(0, weight=1)
+        self.training_configuration_frame.grid_columnconfigure(0, weight=1)
+
+        # training control frame (start/stop button)
+        self.training_control_frame = customtkinter.CTkFrame(self.training_frame, fg_color="transparent")
+        self.training_control_frame.grid(row=1, column=0, padx=0, pady=5, sticky="nsew")
+        self.training_control_frame.grid_columnconfigure(0, weight=1)
+        self.training_control_frame.grid_columnconfigure(1, weight=1)
+
+        # training log frame
+        self.training_log_frame = customtkinter.CTkFrame(self.training_frame)
+        self.training_log_frame.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
+        self.training_log_frame.grid_rowconfigure(0, weight=1)
+        self.training_log_frame.grid_columnconfigure(0, weight=1)
+
+        # training configuration tabview
+        self.training_configuration_tabview = customtkinter.CTkTabview(self.training_configuration_frame)
+        self.training_configuration_tabview.pack(fill="both", expand=True, padx=10, pady=10)
+        # add dataset tab
+        self.training_configuration_tabview.add("Dataset")
+        self.training_configuration_tabview.add("Models")
+        self.training_configuration_tabview.add("Hyperparameters")
+        self.training_configuration_tabview.add("Validation")
+
+        self.TrainingConfiguration_WidgetsConfigure()
+
+        self.TrainingControl_WidgetsConfigure()
+
+        self.TrainingLog_WidgetsConfigure()
+
+    def TrainingConfiguration_WidgetsConfigure(self):
+
+        #-------------------------------------------------------------------------------#
+        #                              DATASET TAB SECTION                              #
+        #-------------------------------------------------------------------------------#
+        self.dataset_tab = self.training_configuration_tabview.tab("Dataset")
+
+        # dataset yaml label
+        self.dataset_yaml_label \
+            = customtkinter.CTkLabel(self.dataset_tab, text="Dataset YAML")
+        self.dataset_yaml_label.pack(anchor="w", padx=10, pady=(10, 5))
+
+        # dataset yaml entry
+        self.dataset_yaml_entry \
+            = customtkinter.CTkEntry(self.dataset_tab, textvariable=self.dataset_yaml_var, width=300)
+        self.dataset_yaml_entry.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # project output label
+        self.training_project_label \
+            = customtkinter.CTkLabel(self.dataset_tab, text="Project Name")
+        self.training_project_label.pack(anchor="w", padx=10, pady=(5, 5))
+        
+        # project entry
+        self.training_project_entry \
+            = customtkinter.CTkEntry(self.dataset_tab, textvariable=self.training_project_var, width=300)
+        self.training_project_entry.pack(anchor="w", padx=10, pady=(0, 10))
+
+
+        #-------------------------------------------------------------------------------#
+        #                              DATASET TAB SECTION                              #
+        #-------------------------------------------------------------------------------#
+        self.models_tab = self.training_configuration_tabview.tab("Models")
+
+        # model type
+        self.training_model_type_label \
+            = customtkinter.CTkLabel(self.models_tab, text="Models Type")
+        self.training_model_type_label.pack(anchor="w", padx=10, pady=(10, 5))
+
+        # training model type combobox
+        self.trainning_model_type_combobox \
+            = customtkinter.CTkComboBox(self.models_tab, variable=self.training_model_type_var,
+                                        values=["YOLO26", "YOLO12", "YOLO11",
+                                                "YOLOv10", "YOLOv9", "YOLOv8",
+                                                "YOLOv7", "YOLOv6", "YOLOv5",
+                                                "YOLOv4", "YOLOv3"])
+        self.trainning_model_type_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # training pretrained size combobox
+        self.training_pretrained_size_combobox \
+            = customtkinter.CTkComboBox(self.models_tab,
+                                        variable=self.training_pretrained_size_var,
+                                        values=["n", "s", "m", "l", "x"])
+        self.training_pretrained_size_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+
+
+        #-------------------------------------------------------------------------------#
+        #                       HYPERPARAMETERS TAB SECTION                             #
+        #-------------------------------------------------------------------------------#
+        self.hyperparameters_tab = self.training_configuration_tabview.tab("Hyperparameters")
+
+        # Epoch numbers
+        self.epochs_label = customtkinter.CTkLabel(self.hyperparameters_tab, text="Epochs")
+        self.epochs_label.pack(anchor="w", padx=10)
+
+        # epoch entry
+        self.epochs_entry = customtkinter.CTkEntry(self.hyperparameters_tab, textvariable=self.epochs_var)
+        self.epochs_entry.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # batch label
+        self.batch_size_label \
+            = customtkinter.CTkLabel(self.hyperparameters_tab, text="Batch Size")
+        self.batch_size_label.pack(anchor="w", padx=10)
+        
+        # batch size entry
+        self.batch_size_entry = customtkinter.CTkEntry(self.hyperparameters_tab, textvariable=self.batch_size_var)
+        self.batch_size_entry.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # image size label
+        self.image_size_label = customtkinter.CTkLabel(self.hyperparameters_tab, text="Image Size")
+        self.image_size_label.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # image size combobox
+        self.image_size_combobox \
+            = customtkinter.CTkComboBox(self.hyperparameters_tab,
+                                        variable=self.train_image_size_var,
+                                        values=["640", "960", "1280"])
+        self.image_size_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # device label
+        self.device_label = customtkinter.CTkLabel(self.hyperparameters_tab, text="Training Device")
+        self.device_label.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # device combobox
+        self.device_combobox \
+            = customtkinter.CTkComboBox(self.hyperparameters_tab,
+                                        variable=self.train_device_var,
+                                        values=["GPU", "CPU"])
+        self.device_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+
+        self.amp_checkbox = customtkinter.CTkCheckBox(self.hyperparameters_tab,
+                                                      text="Enable AMP (FP16)",
+                                                      variable=self.train_amp_var)
+        self.amp_checkbox.pack(anchor="w", padx=10, pady=(0, 10))
+
+
+        #-------------------------------------------------------------------------------#
+        #                          VALIDATION TAB SECTION                               #
+        #-------------------------------------------------------------------------------#
+        self.validation_tab = self.training_configuration_tabview.tab("Validation")
+        
+        # run validation after training checkbox
+        self.run_validation_checkbox \
+            = customtkinter.CTkCheckBox(self.validation_tab,
+                                        text="Run Validation After Training",
+                                        variable=self.run_validation_var)
+        self.run_validation_checkbox.pack(anchor="w", padx=10, pady=10)
+
+        # show results image after training checkbox
+        self.show_results_validation_checkbox \
+            = customtkinter.CTkCheckBox(self.validation_tab,
+                                        text="Show Result Validation After Training",
+                                        variable=self.show_result_validation_var)
+        self.show_results_validation_checkbox.pack(anchor="w", padx=10, pady=10)
+
+    def TrainingControl_WidgetsConfigure(self):
+
+        # start training button
+        self.start_training_button \
+            = customtkinter.CTkButton(self.training_control_frame,
+                                     text="▶ Start Training",
+                                     command=self.StartTraining_Event,
+                                     width=180,
+                                     height=40)
+        self.start_training_button.grid(row=0, column=0, padx=(0, 5), pady=10, sticky="ew")
+
+        # stop training button
+        self.stop_training_button \
+            = customtkinter.CTkButton(self.training_control_frame,
+                                     text="■ Stop Training",
+                                     command=self.StopTraining_Event,
+                                     width=180,
+                                     height=40)
+        self.stop_training_button.grid(row=0, column=1, padx=(0, 5), pady=10, sticky="ew")
+
+    def TrainingLog_WidgetsConfigure(self):
+
+        self.training_log_textbox \
+            = LogTextbox(self.training_log_frame, textbox_width=900, textbox_height=300)
+        self.training_log_textbox.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def StartTraining_Event(self):
+
         pass
+
+    def StopTraining_Event(self):
+
+        pass
+
 
     # DATASET PANEL SETUP -----------------------------------------#
     def DatasetPanel_Adapter(self):
@@ -1215,7 +1447,7 @@ class MainWindow(DragnDropSources):
         self.dataset_menu_tab.configure(fg_color="transparent")
 
         self.inference_frame.grid_forget()
-        self.train_frame.grid_forget()
+        self.training_frame.grid_forget()
         self.dataset_frame.grid_forget()
 
         if frame_name == "Inference":
@@ -1223,7 +1455,7 @@ class MainWindow(DragnDropSources):
             self.inference_frame.grid(row=0, column=0, sticky="nsew")
         elif frame_name == "Train":
             self.train_menu_tab.configure(fg_color=("gray75", "gray25"))
-            self.train_frame.grid(row=0, column=0, sticky="nsew")
+            self.training_frame.grid(row=0, column=0, sticky="nsew")
         elif frame_name == "Dataset":
             self.dataset_menu_tab.configure(fg_color=("gray75", "gray25"))
             self.dataset_frame.grid(row=0, column=0, sticky="nsew")

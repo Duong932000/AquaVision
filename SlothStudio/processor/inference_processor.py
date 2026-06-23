@@ -5,8 +5,8 @@ import json
 import yt_dlp
 import threading
 from pathlib import Path
-from datetime import datetime
 from ultralytics import YOLO
+from datetime import datetime
 
 # internal modules
 from utils.load_config import _get_root_dir
@@ -242,14 +242,14 @@ class InferenceProcessor:
                 tracker_yaml = "botsort.yaml"
             elif tracker == "ByteTrack":
                 tracker_yaml = "bytetrack.yaml"
-            elif tracker == "DeepSORT":
-                tracker_yaml = "deepsort"
-            elif tracker == "StrongSORT":
-                tracker_yaml = "strongsort"
+            elif tracker == "Deep OC-SORT":
+                tracker_yaml = "deepocsort.yaml"
             elif tracker == "OC-SORT":
-                tracker_yaml = "ocsort"
+                tracker_yaml = "ocsort.yaml"
+            elif tracker == "FastTracker":
+                tracker_yaml = "fasttrack.yaml"
             else:
-                tracker_yaml = "deepocsort"
+                tracker_yaml = "tracktrack.yaml"
 
         video_writer_initialized = False
 
