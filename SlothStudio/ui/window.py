@@ -809,7 +809,7 @@ class MainWindow(DragnDropSources):
         self.pretrained_model_version_optionmenu \
             = customtkinter.CTkOptionMenu(self.pretrained_model_frame,
                                           variable=self.pretrained_version_var,
-                                          values=["YOLO26", "YOLO11", "YOLOv8"])
+                                          values=["YOLO26", "YOLO12", "YOLO11", "YOLOv8"])
         self.pretrained_model_version_optionmenu.pack(fill="x", pady=(0, 10))
 
         self.pretrained_model_type_optionmenu \

@@ -69,7 +69,7 @@ Mà phát triển theo hướng:
 
 ### Phase 1 - Giám sát hoạt động cơ bản
 
-- Mục tiêu: xác định đàn cá có hoạt động bình thường hay không/
+- Mục tiêu: xác định đàn cá có hoạt động bình thường hay không
 
 - Chức năng:
     Fish Detection: Phát hiện cá trong khung hình
