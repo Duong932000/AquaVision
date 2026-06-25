@@ -15,6 +15,7 @@ from tkinterdnd2 import TkinterDnD, DND_ALL
 from ui.assets import asset_resources
 from processor.system_monitor import SystemUsageMonitor
 from processor.inference_processor import InferenceProcessor
+from processor.training_processor import TrainingProcessor
 
 # custom appearance of UI
 customtkinter.set_appearance_mode("dark")
@@ -90,6 +91,42 @@ class MainWindow(DragnDropSources):
     width_dashboard = 1300
     height_dashboard = 800
 
+    MODEL_FAMILIES = {
+
+        "YOLO": {
+            "versions": [
+                "YOLO26",
+                "YOLO12",
+                "YOLO11",
+                "YOLOv10",
+                "YOLOv9",
+                "YOLOv8"
+            ],
+            "sizes": ["n", "s", "m", "l", "x"]
+        },
+
+        "RT-DETR": {
+            "versions": [
+                "RT-DETR",
+                "RT-DETRv2"
+            ],
+            "sizes": ["l", "x"]
+        },
+
+        "RF-DETR": {
+            "versions": [
+                "RF-DETR"
+            ],
+            "sizes": [
+                "nano",
+                "small",
+                "medium",
+                "large",
+                "xlarge"
+            ]
+        }
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -157,12 +194,11 @@ class MainWindow(DragnDropSources):
         self.training_project_var = customtkinter.StringVar(value="")
         
         # variable for models
-        self.training_model_type_var = customtkinter.StringVar(value="Pretrained")
-        self.training_model_path_var = customtkinter.StringVar(value="")
-        self.training_pretrained_version_var = customtkinter.StringVar(value="YOLO26")
-        self.training_pretrained_size_var = customtkinter.StringVar(value="m")
+        self.model_family_var = customtkinter.StringVar(value="YOLO")
+        self.model_version_var = customtkinter.StringVar(value="YOLO26")
+        self.model_size_var = customtkinter.StringVar(value="n")
 
-        # variable for hyperparameters
+        # variable for training
         self.epochs_var = customtkinter.StringVar(value="100")
         self.batch_size_var = customtkinter.StringVar(value="16")
         self.train_image_size_var = customtkinter.StringVar(value="640")
@@ -173,6 +209,10 @@ class MainWindow(DragnDropSources):
         # variable for validation
         self.run_validation_var = customtkinter.BooleanVar(value=True)
         self.show_result_validation_var = customtkinter.BooleanVar(value=True)
+
+        # variable for models export
+        self.export_onnx_var = customtkinter.BooleanVar(value=True)
+        self.export_tensorrt_var = customtkinter.BooleanVar(value=True)
 
         # init UI
         self.GUI_InitSetupResources_Controller()
@@ -1231,206 +1271,402 @@ class MainWindow(DragnDropSources):
     # TRAIN PANEL SETUP -------------------------------------------#
     def TrainPanel_Adapter(self):
 
-        # setup rate of training_frame
+        # main layout
+        self.training_frame.grid_rowconfigure(0, weight=1)
         self.training_frame.grid_columnconfigure(0, weight=1)
-        # configuration
-        self.training_frame.grid_columnconfigure(0, weight=4)
-        # button
-        self.training_frame.grid_columnconfigure(1, weight=0)
-        # logs
-        self.training_frame.grid_columnconfigure(0, weight=2)
+        self.training_frame.grid_columnconfigure(1, weight=2)
 
-        # training configuration frame
+        # LEFT SIDE: training configuration frame
         self.training_configuration_frame = customtkinter.CTkFrame(self.training_frame)
         self.training_configuration_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
         self.training_configuration_frame.grid_rowconfigure(0, weight=1)
+        self.training_configuration_frame.grid_rowconfigure(1, weight=0)
         self.training_configuration_frame.grid_columnconfigure(0, weight=1)
 
-        # training control frame (start/stop button)
-        self.training_control_frame = customtkinter.CTkFrame(self.training_frame, fg_color="transparent")
-        self.training_control_frame.grid(row=1, column=0, padx=0, pady=5, sticky="nsew")
-        self.training_control_frame.grid_columnconfigure(0, weight=1)
-        self.training_control_frame.grid_columnconfigure(1, weight=1)
-
-        # training log frame
+        # RIGHT SIDE: training log frame
         self.training_log_frame = customtkinter.CTkFrame(self.training_frame)
-        self.training_log_frame.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
-        self.training_log_frame.grid_rowconfigure(0, weight=1)
+        self.training_log_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+        self.training_log_frame.grid_rowconfigure(1, weight=1)
         self.training_log_frame.grid_columnconfigure(0, weight=1)
 
-        # training configuration tabview
-        self.training_configuration_tabview = customtkinter.CTkTabview(self.training_configuration_frame)
-        self.training_configuration_tabview.pack(fill="both", expand=True, padx=10, pady=10)
-        # add dataset tab
-        self.training_configuration_tabview.add("Dataset")
-        self.training_configuration_tabview.add("Models")
-        self.training_configuration_tabview.add("Hyperparameters")
-        self.training_configuration_tabview.add("Validation")
-
         self.TrainingConfiguration_WidgetsConfigure()
-
-        self.TrainingControl_WidgetsConfigure()
 
         self.TrainingLog_WidgetsConfigure()
 
     def TrainingConfiguration_WidgetsConfigure(self):
 
-        #-------------------------------------------------------------------------------#
-        #                              DATASET TAB SECTION                              #
-        #-------------------------------------------------------------------------------#
-        self.dataset_tab = self.training_configuration_tabview.tab("Dataset")
+        # TABVIEW
+        self.training_tabview \
+            = customtkinter.CTkTabview(self.training_configuration_frame)
+        self.training_tabview.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        # dataset yaml label
-        self.dataset_yaml_label \
-            = customtkinter.CTkLabel(self.dataset_tab, text="Dataset YAML")
-        self.dataset_yaml_label.pack(anchor="w", padx=10, pady=(10, 5))
+        # add Training Configuration tab
+        self.training_tabview.add("Training Configuration")
+        self.training_tab = self.training_tabview.tab("Training Configuration")
 
-        # dataset yaml entry
-        self.dataset_yaml_entry \
-            = customtkinter.CTkEntry(self.dataset_tab, textvariable=self.dataset_yaml_var, width=300)
-        self.dataset_yaml_entry.pack(anchor="w", padx=10, pady=(0, 10))
+        # Scroll Frame of training config
+        self.training_scroll_frame \
+            = customtkinter.CTkScrollableFrame(self.training_tab, corner_radius=10)
+        self.training_scroll_frame.grid_columnconfigure(
+            0,
+            weight=1
+        )
 
-        # project output label
-        self.training_project_label \
-            = customtkinter.CTkLabel(self.dataset_tab, text="Project Name")
-        self.training_project_label.pack(anchor="w", padx=10, pady=(5, 5))
-        
-        # project entry
-        self.training_project_entry \
-            = customtkinter.CTkEntry(self.dataset_tab, textvariable=self.training_project_var, width=300)
-        self.training_project_entry.pack(anchor="w", padx=10, pady=(0, 10))
+        self.training_scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
 
-        #-------------------------------------------------------------------------------#
-        #                              DATASET TAB SECTION                              #
-        #-------------------------------------------------------------------------------#
-        self.models_tab = self.training_configuration_tabview.tab("Models")
+        row = 0
 
-        # model type
-        self.training_model_type_label \
-            = customtkinter.CTkLabel(self.models_tab, text="Models Type")
-        self.training_model_type_label.pack(anchor="w", padx=10, pady=(10, 5))
+        row = self.CreateSectionTitle(self.training_scroll_frame, row, "Dataset")
 
-        # training model type combobox
-        self.trainning_model_type_combobox \
-            = customtkinter.CTkComboBox(self.models_tab, variable=self.training_model_type_var,
-                                        values=["YOLO26", "YOLO12", "YOLO11",
-                                                "YOLOv10", "YOLOv9", "YOLOv8",
-                                                "YOLOv7", "YOLOv6", "YOLOv5",
-                                                "YOLOv4", "YOLOv3"])
-        self.trainning_model_type_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+        row = self.CreateEntry(self.training_scroll_frame, row, "Dataset YAML", self.dataset_yaml_var)
 
-        # training pretrained size combobox
-        self.training_pretrained_size_combobox \
-            = customtkinter.CTkComboBox(self.models_tab,
-                                        variable=self.training_pretrained_size_var,
-                                        values=["n", "s", "m", "l", "x"])
-        self.training_pretrained_size_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+        row = self.CreateEntry(self.training_scroll_frame, row, "Project Name", self.training_project_var)
 
 
-        #-------------------------------------------------------------------------------#
-        #                       HYPERPARAMETERS TAB SECTION                             #
-        #-------------------------------------------------------------------------------#
-        self.hyperparameters_tab = self.training_configuration_tabview.tab("Hyperparameters")
+        # Model widgets
+        row = self.CreateSectionTitle(self.training_scroll_frame, row, "Model")
 
-        # Epoch numbers
-        self.epochs_label = customtkinter.CTkLabel(self.hyperparameters_tab, text="Epochs")
-        self.epochs_label.pack(anchor="w", padx=10)
+        row = self.CreateCombobox(self.training_scroll_frame,row,"Model Family",self.model_family_var, ["YOLO", "RT-DETR", "RF-DETR"], self.ModelFamilyChanged_Event)
 
-        # epoch entry
-        self.epochs_entry = customtkinter.CTkEntry(self.hyperparameters_tab, textvariable=self.epochs_var)
-        self.epochs_entry.pack(anchor="w", padx=10, pady=(0, 10))
+        self.model_version_label, self.model_version_combobox, row = self.CreateComboboxWidget(self.training_scroll_frame, row, "Model Version", self.model_version_var, self.MODEL_FAMILIES["YOLO"]["versions"])
 
-        # batch label
-        self.batch_size_label \
-            = customtkinter.CTkLabel(self.hyperparameters_tab, text="Batch Size")
-        self.batch_size_label.pack(anchor="w", padx=10)
-        
-        # batch size entry
-        self.batch_size_entry = customtkinter.CTkEntry(self.hyperparameters_tab, textvariable=self.batch_size_var)
-        self.batch_size_entry.pack(anchor="w", padx=10, pady=(0, 10))
-        
-        # image size label
-        self.image_size_label = customtkinter.CTkLabel(self.hyperparameters_tab, text="Image Size")
-        self.image_size_label.pack(anchor="w", padx=10, pady=(0, 10))
+        self.model_size_label, self.model_size_combobox, row = self.CreateComboboxWidget(self.training_scroll_frame, row, "Model Size", self.model_size_var, self.MODEL_FAMILIES["YOLO"]["sizes"])
 
-        # image size combobox
-        self.image_size_combobox \
-            = customtkinter.CTkComboBox(self.hyperparameters_tab,
-                                        variable=self.train_image_size_var,
-                                        values=["640", "960", "1280"])
-        self.image_size_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+        # Training widgets
+        row = self.CreateSectionTitle(self.training_scroll_frame, row, "Training")
 
-        # device label
-        self.device_label = customtkinter.CTkLabel(self.hyperparameters_tab, text="Training Device")
-        self.device_label.pack(anchor="w", padx=10, pady=(0, 10))
+        row = self.CreateEntry(self.training_scroll_frame, row, "Epochs", self.epochs_var)
 
-        # device combobox
-        self.device_combobox \
-            = customtkinter.CTkComboBox(self.hyperparameters_tab,
-                                        variable=self.train_device_var,
-                                        values=["GPU", "CPU"])
-        self.device_combobox.pack(anchor="w", padx=10, pady=(0, 10))
+        row = self.CreateEntry(self.training_scroll_frame, row, "Batch Size", self.batch_size_var)
 
-        self.amp_checkbox = customtkinter.CTkCheckBox(self.hyperparameters_tab,
-                                                      text="Enable AMP (FP16)",
-                                                      variable=self.train_amp_var)
-        self.amp_checkbox.pack(anchor="w", padx=10, pady=(0, 10))
+        row = self.CreateCombobox(self.training_scroll_frame, row, "Image Size", self.train_image_size_var, ["640", "960", "1280"])
+
+        row = self.CreateCombobox(self.training_scroll_frame, row, "Device", self.train_device_var, ["GPU", "CPU"], self.DeviceChanged_Event)
+
+        self.amp_checkbox = customtkinter.CTkCheckBox(self.training_scroll_frame, text="Enable AMP FP16", variable=self.train_amp_var)
+
+        self.amp_checkbox.grid(row=row,column=0,padx=10,pady=5,sticky="w")
+
+        row += 1
 
 
-        #-------------------------------------------------------------------------------#
-        #                          VALIDATION TAB SECTION                               #
-        #-------------------------------------------------------------------------------#
-        self.validation_tab = self.training_configuration_tabview.tab("Validation")
-        
-        # run validation after training checkbox
-        self.run_validation_checkbox \
-            = customtkinter.CTkCheckBox(self.validation_tab,
-                                        text="Run Validation After Training",
-                                        variable=self.run_validation_var)
-        self.run_validation_checkbox.pack(anchor="w", padx=10, pady=10)
+        # Validation widgets
+        row = self.CreateSectionTitle(self.training_scroll_frame, row, "Validation")
 
-        # show results image after training checkbox
-        self.show_results_validation_checkbox \
-            = customtkinter.CTkCheckBox(self.validation_tab,
-                                        text="Show Result Validation After Training",
-                                        variable=self.show_result_validation_var)
-        self.show_results_validation_checkbox.pack(anchor="w", padx=10, pady=10)
+        self.run_validation_checkbox = customtkinter.CTkCheckBox(self.training_scroll_frame, text="Run Validation", variable=self.run_validation_var)
 
-    def TrainingControl_WidgetsConfigure(self):
+        self.run_validation_checkbox.grid(row=row, column=0, padx=10, pady=5, sticky="w" )
 
-        # start training button
-        self.start_training_button \
-            = customtkinter.CTkButton(self.training_control_frame,
-                                     text="▶ Start Training",
-                                     command=self.StartTraining_Event,
-                                     width=180,
-                                     height=40)
-        self.start_training_button.grid(row=0, column=0, padx=(0, 5), pady=10, sticky="ew")
+        row += 1
 
-        # stop training button
-        self.stop_training_button \
-            = customtkinter.CTkButton(self.training_control_frame,
-                                     text="■ Stop Training",
-                                     command=self.StopTraining_Event,
-                                     width=180,
-                                     height=40)
-        self.stop_training_button.grid(row=0, column=1, padx=(0, 5), pady=10, sticky="ew")
+        self.show_validation_checkbox = customtkinter.CTkCheckBox(self.training_scroll_frame, text="Show Validation Result", variable=self.show_result_validation_var)
+
+        self.show_validation_checkbox.grid(row=row,column=0,padx=10,pady=5,sticky="w")
+
+        row += 1
+
+        # Export widgets
+        row = self.CreateSectionTitle(self.training_scroll_frame, row,"Export")
+
+        self.export_onnx_checkbox = customtkinter.CTkCheckBox(self.training_scroll_frame, text="Export ONNX",variable=self.export_onnx_var)
+        self.export_onnx_checkbox.grid(row=row, column=0, padx=10, pady=5, sticky="w")
+
+        row += 1
+
+        self.export_tensorrt_checkbox = customtkinter.CTkCheckBox(self.training_scroll_frame, text="Export TensorRT", variable=self.export_tensorrt_var)
+        self.export_tensorrt_checkbox.grid(row=row,column=0,padx=10,pady=5,sticky="w")
+
+        row += 1
+
+
+        # Control Buttons
+        self.training_control_frame = customtkinter.CTkFrame(self.training_configuration_frame)
+
+        self.training_control_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        self.training_control_frame.grid_columnconfigure((0, 1), weight=1)
+
+        self.start_training_button = customtkinter.CTkButton(self.training_control_frame, text="Start", command=self.StartTraining_Event, height=35)
+        self.start_training_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+
+        self.stop_training_button = customtkinter.CTkButton(self.training_control_frame, text="Stop", command=self.StopTraining_Event, state="disabled", height=35)
+        self.stop_training_button.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
     def TrainingLog_WidgetsConfigure(self):
 
+        self.training_log_toolbar = customtkinter.CTkFrame(self.training_log_frame)
+        self.training_log_toolbar.grid(row=0,column=0,padx=10,pady=10,sticky="ew")
+
+        self.clear_log_button \
+            = customtkinter.CTkButton(self.training_log_toolbar,
+                                      text="Clear Log",
+                                      width=120,
+                                      command=self.ClearLog_Event)
+
+        self.clear_log_button.pack(side="left", padx=5)
+
+        self.save_log_button \
+            = customtkinter.CTkButton(self.training_log_toolbar,
+                                      text="Save Log",
+                                      width=120,
+                                      command=self.SaveLog_Event)
+
+        self.save_log_button.pack(side="left", padx=5)
+
         self.training_log_textbox \
-            = LogTextbox(self.training_log_frame, textbox_width=900, textbox_height=300)
-        self.training_log_textbox.pack(fill="both", expand=True, padx=10, pady=10)
+            = customtkinter.CTkTextbox(self.training_log_frame)
+        self.training_log_textbox.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+
+    def CreateSectionTitle(self,
+                        parent,
+                        row,
+                        title):
+
+        section_label = customtkinter.CTkLabel(
+            parent,
+            text=title,
+            font=customtkinter.CTkFont(
+                size=16,
+                weight="bold"
+            )
+        )
+
+        section_label.grid(
+            row=row,
+            column=0,
+            padx=10,
+            pady=(15, 5),
+            sticky="w"
+        )
+
+        separator = customtkinter.CTkFrame(
+            parent,
+            height=2
+        )
+
+        separator.grid(
+            row=row + 1,
+            column=0,
+            padx=10,
+            pady=(0, 10),
+            sticky="ew"
+        )
+
+        return row + 2
+
+    def CreateEntry(self,
+                    parent,
+                    row,
+                    label_text,
+                    variable):
+
+        label = customtkinter.CTkLabel(
+            parent,
+            text=label_text
+        )
+
+        label.grid(
+            row=row,
+            column=0,
+            padx=10,
+            pady=(5, 0),
+            sticky="w"
+        )
+
+        entry = customtkinter.CTkEntry(
+            parent,
+            textvariable=variable
+        )
+
+        entry.grid(
+            row=row + 1,
+            column=0,
+            padx=10,
+            pady=(0, 5),
+            sticky="ew"
+        )
+
+        return row + 2
+
+    def CreateCombobox(self,
+                    parent,
+                    row,
+                    label_text,
+                    variable,
+                    values,
+                    command=None):
+
+        label = customtkinter.CTkLabel(
+            parent,
+            text=label_text
+        )
+
+        label.grid(
+            row=row,
+            column=0,
+            padx=10,
+            pady=(5, 0),
+            sticky="w"
+        )
+
+        combobox = customtkinter.CTkComboBox(
+            parent,
+            variable=variable,
+            values=values,
+            command=command
+        )
+
+        combobox.grid(
+            row=row + 1,
+            column=0,
+            padx=10,
+            pady=(0, 5),
+            sticky="ew"
+        )
+
+        return row + 2
+
+    def CreateComboboxWidget(self,
+                            parent,
+                            row,
+                            label_text,
+                            variable,
+                            values,
+                            command=None):
+
+        label = customtkinter.CTkLabel(
+            parent,
+            text=label_text
+        )
+
+        label.grid(
+            row=row,
+            column=0,
+            padx=10,
+            pady=(5, 0),
+            sticky="w"
+        )
+
+        combobox = customtkinter.CTkComboBox(
+            parent,
+            variable=variable,
+            values=values,
+            command=command
+        )
+
+        combobox.grid(
+            row=row + 1,
+            column=0,
+            padx=10,
+            pady=(0, 5),
+            sticky="ew"
+        )
+
+        return (
+            label,
+            combobox,
+            row + 2
+        )
+
+    def ModelFamilyChanged_Event(self, value):
+
+        family = self.model_family_var.get()
+
+        versions = self.MODEL_FAMILIES[family]["versions"]
+    
+        sizes = self.MODEL_FAMILIES[family]["sizes"]
+
+        self.model_version_combobox.configure(values=versions)
+
+        self.model_size_combobox.configure(values=sizes)
+
+        self.model_version_var.set(versions[0])
+
+        self.model_size_var.set(sizes[0])
+
+    def DeviceChanged_Event(self, value):
+
+        if self.train_device_var.get() == "CPU":
+            self.export_tensorrt_var.set(False)
+            self.export_tensorrt_checkbox.configure(state="disabled")
+        else:
+            self.export_tensorrt_checkbox.configure(state="normal")
+
+    def GetTrainingConfiguration(self):
+
+        return {
+            "dataset_yaml": self.dataset_yaml_var.get(),
+            "project_name": self.training_project_var.get(),
+            "model_family": self.model_family_var.get(),
+            "model_version": self.model_version_var.get(),
+            "model_size": self.model_size_var.get(),
+            "epochs": int(self.epochs_var.get()),
+            "batch_size": int(self.batch_size_var.get()),
+            "imgsz": int(self.train_image_size_var.get()),
+            "device": self.train_device_var.get(),
+            "amp": self.train_amp_var.get(),
+            "run_validation": self.run_validation_var.get(),
+            "show_validation": self.show_result_validation_var.get(),
+            "export_onnx": self.export_onnx_var.get(),
+            "export_tensorrt": self.export_tensorrt_var.get()
+        }
+
+    def AppendTrainingLog(self, message):
+
+        self.training_log_textbox.insert("end", message)
+        self.training_log_textbox.see("end")
+
+    def ClearLog_Event(self):
+
+        self.training_log_textbox.delete("1.0", "end")
+
+    def SaveLog_Event(self):
+
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt")
+        if not file_path:
+            return
+
+        content = self.training_log_textbox.get("1.0", "end")
+
+        with open(file_path, "w", encoding="utf-8") as file:
+            file.write(content)
 
     def StartTraining_Event(self):
 
-        pass
+        config = self.GetTrainingConfiguration()
+
+        self.training_processor = TrainingProcessor(
+            config=config,
+            log_callback=self.AppendTrainingLog
+        )
+
+        self.training_processor.start()
+
+        self.start_training_button.configure(
+            state="disabled"
+        )
+
+        self.stop_training_button.configure(
+            state="normal"
+        )
 
     def StopTraining_Event(self):
 
-        pass
+        if self.training_processor:
 
+            self.training_processor.stop()
+
+        self.AppendTrainingLog(
+            "Stop requested...\n"
+        )
+
+        self.start_training_button.configure(
+            state="normal"
+        )
+
+        self.stop_training_button.configure(
+            state="disabled"
+        )
 
     # DATASET PANEL SETUP -----------------------------------------#
     def DatasetPanel_Adapter(self):
