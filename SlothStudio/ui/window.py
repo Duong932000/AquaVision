@@ -1314,7 +1314,6 @@ class MainWindow(DragnDropSources):
 
         self.training_scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-
         row = 0
 
         row = self.CreateSectionTitle(self.training_scroll_frame, row, "Dataset")

@@ -1,0 +1,166 @@
+# ONE FOR ALL
+application:
+  name: "Sloth-Studio"
+  version: "1.0.0"
+
+# MODEL CONFIGURATION
+models:
+  families:
+
+    yolo:
+      versions:
+        - YOLO26
+        - YOLO12
+        - YOLO11
+        - YOLOv10
+        - YOLOv9
+        - YOLOv8
+      sizes:
+        - n
+        - s
+        - m
+        - l
+        - x
+
+    rt-detr:
+      versions:
+        - RT-DETR
+        - RT-DETRv2
+      sizes:
+        - l
+        - x
+
+    rf-detr:
+      versions:
+        - RF-DETR
+      sizes:
+        - nano
+        - small
+        - medium
+        - large
+        - xlarge
+
+# TRACKER CONFIGURATION
+trackers:
+  default: BoT-SORT
+  availabel:
+    - BoT-SORT
+    - ByteTrack
+    - Deep OC-SORT
+    - OC-SORT
+    - FastTracker
+    - TrackTrack
+
+# INFERENCE CONFIGURATION
+inference:
+  source:
+    default_type: Youtube URL
+    source_types:
+      - Youtube URL
+      - Local Files
+
+  models:
+    default_mode: Trained
+    selection_modes:
+      - Trained
+      - Pretrained
+    pretrained:
+      default_family: YOLO
+      default_version: YOLO26
+      default_size: m
+
+  tracking:
+    enabled: true
+    default_tracker: BoT-SORT
+
+  detection:
+    confidence:
+      default: 0.25
+      min: 0.05
+      max: 1.0
+    iou:
+      default: 0.45
+      min: 0.10
+      max: 1.0
+    image_size:
+      default: 640
+      options:
+        - 640
+        - 960
+        - 1280
+    fp16:
+      default: true
+    max_detection:
+      default: 300
+      options:
+        - 100
+        - 300
+        - 500
+        - 1000
+
+  output:
+    save_video:
+      default: true
+    save_frames:
+      default: true
+
+  runtime:
+    default_device: CUDA
+    devices:
+      - Auto
+      - CUDA
+      - CPU
+    
+# TRAINING CONFIGURATION
+training:
+  dataset:
+    dataset_yaml: ""
+    project_name: ""
+
+  models:
+    default_family: YOLO
+    default_version: YOLO26
+    default_size: m
+
+  hyperparameters:
+    epochs:
+      default: 100
+      min: 1
+      max: 10000
+    batch_size:
+      default: 16
+      options:
+        - 1
+        - 2
+        - 4
+        - 8
+        - 16
+        - 32
+        - 64
+    image_size:
+      default: 640
+      options:
+        - 640
+        - 960
+        - 1280
+    workers:
+      default: 8
+    amp:
+      default: true
+    device:
+      default: GPU
+      options:
+        - GPU
+        - CPU
+
+  validation:
+    run_validation:
+      default: true
+    show_result:
+      default: true
+  
+  export:
+    onnx:
+      enabled: true
+    tensorrt:
+      enabled: true
