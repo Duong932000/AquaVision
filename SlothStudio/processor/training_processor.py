@@ -53,9 +53,10 @@ class TrainingProcessor:
             "export_tensorrt": bool(cfg["export"]["tensorrt"]),
         }
 
-    def log(self, msg):
+    def log(self, level, message):
+
         if self.log_callback:
-            self.log_callback(msg)
+            self.log_callback(level, message)
 
     def create_trainer(self):
 
@@ -74,44 +75,61 @@ class TrainingProcessor:
 
     def start(self):
 
-        self.thread = threading.Thread(
-            target=self._worker,
-            daemon=True
-        )
+        self.thread = threading.Thread(target=self.worker, daemon=True)
         self.thread.start()
 
     def stop(self):
+
         if self.trainer:
             self.trainer.stop()
 
-    def _worker(self):
+    def worker(self):
 
         try:
-            self._log_header("TRAINING STARTED")
+
+            self.log(
+                "INFO",
+                "TRAINING STARTED"
+            )
 
             self.trainer = self.create_trainer()
+
             model_path = self.trainer.train()
 
-            # validation
             if self.config["run_validation"]:
-                validator = ValidationProcessor(self.log_callback)
-                validator.validate(model_path)
 
-            # export
-            exporter = ModelsExportProcessor(self.log_callback)
+                validator = ValidationProcessor(
+                    self.log_callback
+                )
+
+                validator.validate(
+                    model_path
+                )
+
+            exporter = ModelsExportProcessor(
+                self.log_callback
+            )
 
             if self.config["export_onnx"]:
-                exporter.export_onnx(model_path)
+
+                exporter.export_onnx(
+                    model_path
+                )
 
             if self.config["export_tensorrt"]:
-                exporter.export_tensorrt(model_path)
 
-            self.log("\nPIPELINE COMPLETED\n")
+                exporter.export_tensorrt(
+                    model_path
+                )
 
-        except Exception as e:
-            self.log(f"\nERROR:\n{str(e)}\n")
+            self.log(
+                "INFO",
+                "PIPELINE COMPLETED"
+            )
 
-    def _log_header(self, msg):
-        self.log("\n==============================")
-        self.log(msg)
-        self.log("==============================\n")
+        except Exception as error:
+
+            self.log(
+                "ERROR",
+                str(error)
+            )

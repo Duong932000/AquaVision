@@ -6,16 +6,17 @@ import numpy
 import customtkinter
 from PIL import Image, ImageTk
 from queue import Queue, Empty
-from tkinter import filedialog
 from CTkMessagebox import CTkMessagebox
 
 # internal modules
-from ui.textbox import LogTextbox
+from utils.log_textbox import LogTextboxUtils
 from ui.dragdrop import DND_ALL, DnD
 from ui.assets import asset_resources
+from utils.filedialog import FileDialogUtils
 from processor.system_monitor import SystemUsageMonitor
 from processor.inference_processor import InferenceProcessor
 from processor.training_processor import TrainingProcessor
+
 
 # custom appearance of UI
 customtkinter.set_appearance_mode("dark")
@@ -289,6 +290,7 @@ class MainWindow(DnD):
         self.FrameSelection_Adapter("Inference")
     
     # MENU PANEL SETUP --------------------------------------------#
+    # -------------------------------------------------------------#
     def MenuPanel_Adapter(self):
 
         # logo
@@ -392,9 +394,7 @@ class MainWindow(DnD):
         self.stop_inference_button.pack(fill="x", padx=10, pady=(10, 10))
 
         self.inference_runtime_mode_log_textbox \
-            = LogTextbox(self.inference_runtime_mode_frame,
-                         textbox_width=260,
-                         textbox_height=500)
+            = LogTextboxUtils(self.inference_runtime_mode_frame)
         self.inference_runtime_mode_log_textbox.pack(fill="both", expand=True, padx=5, pady=5)
 
     def UpdateSystemMonitor_Event(self):
@@ -414,6 +414,7 @@ class MainWindow(DnD):
         self.after(1000,self.UpdateSystemMonitor_Event)
 
     # DISPLAY PANEL SETUP -----------------------------------------#
+    # -------------------------------------------------------------#
     def DisplayPanel_Adapter(self):
 
         # inference frame
@@ -437,6 +438,7 @@ class MainWindow(DnD):
             = customtkinter.CTkLabel(self.display_panel, text="")
 
     # INFERENCE PANEL SETUP ---------------------------------------#
+    # -------------------------------------------------------------#
     def InferencePanel_Adapter(self):
 
         # setup rate of inference_frame
@@ -666,17 +668,17 @@ class MainWindow(DnD):
     def BrowseLocalSourceFiles_Event(self):
 
         filepaths \
-            = filedialog.askopenfilenames(title="Select Source Files",
-                                          filetypes=[("Media Files",
-                                                      "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv")])
+            = FileDialogUtils.BrowseFiles(title="Select Source Files",
+                                          filetypes=[("Media Files", "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.mkv")])
         if not filepaths:
             return
-
+        
         for filepath in filepaths:
             if filepath not in self.selected_local_sources:
                 self.selected_local_sources.append(filepath)
 
         self.ShowLocalSourceFiles_Event()
+        
         self.AppendInferenceLog_Event("INFO", f"Added {len(filepaths)} source files")
 
     def ShowLocalSourceFiles_Event(self):
@@ -754,15 +756,22 @@ class MainWindow(DnD):
 
         # Inference Progress textbox
         self.inference_log_textbox \
-            = LogTextbox(self.inference_log_frame)
+            = LogTextboxUtils(self.inference_log_frame)
         self.inference_log_textbox.pack(fill="both", expand=True, padx=10, pady=(10, 10))
 
     def AppendInferenceLog_Event(self, log_type, message):
 
-        self.inference_log_textbox.append_log(log_type, message)
+        # self.inference_log_textbox.append_log(log_type, message)
+
+        # if self.inference_mode:
+        #     self.inference_runtime_mode_log_textbox.append_log(log_type, message)
+
+        targets = [self.inference_log_textbox]
 
         if self.inference_mode:
-            self.inference_runtime_mode_log_textbox.append_log(log_type, message)
+            targets.append(self.inference_runtime_mode_log_textbox)
+        
+        LogTextboxUtils.Broadcast(targets, log_type, message)
 
     def ClearInferenceLog_Event(self):
 
@@ -1036,14 +1045,11 @@ class MainWindow(DnD):
 
     def BrowseTrainedModel_Event(self):
 
-        filepath = filedialog.askopenfilename(title="Select YOLO Model",
-                                              filetypes=[("PyTorch Model", "*.pt")])
-
+        filepath = FileDialogUtils.BrowseFiles(title="Select Model", filetypes=[("Pytorch Model", "*.pt")])
         if not filepath:
-            self.AppendInferenceLog_Event("WARNING",
-                                          f"Model path not foun. Please enter model to continue!")
+            self.AppendInferenceLog_Event("WARNING", "Model path not found. Please enter model to continue!")
             return
-
+        
         self.trained_model_var.set(filepath)
 
         self.AppendInferenceLog_Event("INFO", f"Model selected: {filepath}")
@@ -1236,6 +1242,7 @@ class MainWindow(DnD):
         target.image = photo
 
     # TRAIN PANEL SETUP -------------------------------------------#
+    # -------------------------------------------------------------#
     def TrainPanel_Adapter(self):
 
         # main layout
@@ -1462,14 +1469,12 @@ class MainWindow(DnD):
 
     def BrowseDataset_Event(self):
 
-        filepaths \
-            = filedialog.askopenfilenames(title="Select Dataset YAML Files",
-                                          filetypes=[("Media Files",
-                                                      "*.yaml *.yml")])
-        if not filepaths:
+        filepath = FileDialogUtils.BrowseFiles(title="Select Dataset YAML", filetypes=[("Dataset YAML", "*.yaml *.yml")])
+        if not filepath:
+            self.AppendInferenceLog_Event("WARNING", "Model path not found. Please enter model to continue!")
             return
 
-        self.dataset_yaml_var.set(filepaths)
+        self.dataset_yaml_var.set(filepath)
 
     def ModelFamilyChanged_Event(self, value):
 
@@ -1571,13 +1576,21 @@ class MainWindow(DnD):
         self.save_log_button.pack(side="right", padx=5)
 
         self.training_log_textbox \
-            = customtkinter.CTkTextbox(self.training_log_frame)
+            = LogTextboxUtils(self.training_log_frame)
         self.training_log_textbox.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
-    def AppendTrainingLog_Event(self, message):
+    def AppendTrainingLog_Event(
+            self,
+            level,
+            message):
 
-        self.training_log_textbox.insert("end", message)
-
+        self.after(
+            0,
+            lambda: self.training_log_textbox.log(
+                level,
+                message
+            )
+        )
 
     def ClearLog_Event(self):
 
@@ -1599,7 +1612,6 @@ class MainWindow(DnD):
             = TrainingProcessor(config=self.training_config, log_callback=self.AppendTrainingLog_Event)
         self.training_processor.start()
 
-
     def StopTraining_Event(self):
 
         if self.training_processor:
@@ -1608,11 +1620,13 @@ class MainWindow(DnD):
         # self.AppendTrainingLog_Event("INFO", "Training Stopped")
 
     # DATASET PANEL SETUP -----------------------------------------#
+    # -------------------------------------------------------------#
     def DatasetPanel_Adapter(self):
 
         pass
 
     # FRAME SELECTION SETUP ---------------------------------------#
+    # -------------------------------------------------------------#
     def FrameSelection_Adapter(self, frame_name):
 
         self.inference_menu_tab.configure(fg_color="transparent")
@@ -1646,3 +1660,4 @@ class MainWindow(DnD):
     def DatasetFrame_Event(self):
 
         self.FrameSelection_Adapter("Dataset")
+

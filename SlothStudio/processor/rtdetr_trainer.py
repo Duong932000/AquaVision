@@ -1,36 +1,86 @@
-
 from ultralytics import RTDETR
+from ultralytics.utils import LOGGER
 
+from processor.model_resolver import ModelResolver
+from utils.ultralytics_log import UltralyticsUILogHandler
 
 class RTDETRTrainer:
 
-    def __init__(self, cfg, log_callback=None):
+    def __init__(
+            self,
+            cfg,
+            log_callback=None):
+
         self.cfg = cfg
-        self.log = log_callback
+        self.log_callback = log_callback
+
+        self.logger_handler = None
+
+    def log(
+            self,
+            level,
+            message):
+
+        if self.log_callback:
+            self.log_callback(
+                level,
+                message
+            )
+
+    def stop(self):
+
+        pass
 
     def train(self):
 
-        model = RTDETR(f"rtdetr-{self.cfg['model_size']}.pt")
-
-        self._log("RT-DETR training start")
-
-        results = model.train(
-            data=self.cfg["dataset_yaml"],
-            epochs=self.cfg["epochs"],
-            batch=self.cfg["batch_size"],
-            imgsz=self.cfg["image_size"],
-            amp=self.cfg["amp_fp16"],
-            project="runs/train",
-            name=f"rtdetr_{self.cfg['model_size']}",
-            device=0
+        model_name = ModelResolver.get_model_name(
+            self.cfg["model_family"],
+            self.cfg["model_version"],
+            self.cfg["model_size"]
         )
 
-        best_path = f"{results.save_dir}/weights/best.pt"
+        self.log(
+            "INFO",
+            f"Loading model: {model_name}"
+        )
 
-        self._log(f"RT-DETR done: {best_path}")
+        self.logger_handler = UltralyticsUILogHandler(
+            self.log_callback
+        )
 
-        return best_path
+        LOGGER.addHandler(
+            self.logger_handler
+        )
 
-    def _log(self, msg):
-        if self.log:
-            self.log(msg)
+        try:
+
+            model = RTDETR(
+                model_name
+            )
+
+            results = model.train(
+                data=self.cfg["dataset_yaml"],
+                epochs=self.cfg["epochs"],
+                batch=self.cfg["batch_size"],
+                imgsz=self.cfg["image_size"],
+                amp=self.cfg["amp_fp16"]
+            )
+
+            best_model = (
+                f"{results.save_dir}/weights/best.pt"
+            )
+
+            self.log(
+                "INFO",
+                f"Training completed: {best_model}"
+            )
+
+            return best_model
+
+        finally:
+
+            if self.logger_handler:
+
+                LOGGER.removeHandler(
+                    self.logger_handler
+                )
