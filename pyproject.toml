@@ -22,6 +22,11 @@ dependencies = [
     "tqdm>=4.67.0",
     "loguru>=0.7.3",
     "yt-dlp>=2025.5.22",
+    
+    # RF-DETR 
+    "supervision>=0.25.0",
+    "roboflow>=1.1.0",
+    "rfdetr",
 
     # UI
     "customtkinter==5.2.2",

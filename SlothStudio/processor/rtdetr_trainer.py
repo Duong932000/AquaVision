@@ -1,31 +1,36 @@
 
 from ultralytics import RTDETR
 
-from processor.base_trainer import BaseTrainer
 
+class RTDETRTrainer:
 
-class RTDETRTrainer(BaseTrainer):
+    def __init__(self, cfg, log_callback=None):
+        self.cfg = cfg
+        self.log = log_callback
 
     def train(self):
 
-        version = self.config["model_version"]
+        model = RTDETR(f"rtdetr-{self.cfg['model_size']}.pt")
 
-        size = self.config["model_size"]
+        self._log("RT-DETR training start")
 
-        if version == "RT-DETR":
-            model_name = f"rtdetr-{size}.pt"
-        else:
-            model_name = f"rtdetrv2-{size}.pt"
-
-        self.log(f"Loading model: {model_name}\n")
-
-        model = RTDETR(model_name)
-
-        model.train(
-            data=self.config["dataset_yaml"],
-            epochs=self.config["epochs"],
-            batch=self.config["batch_size"],
-            imgsz=self.config["imgsz"]
+        results = model.train(
+            data=self.cfg["dataset_yaml"],
+            epochs=self.cfg["epochs"],
+            batch=self.cfg["batch_size"],
+            imgsz=self.cfg["image_size"],
+            amp=self.cfg["amp_fp16"],
+            project="runs/train",
+            name=f"rtdetr_{self.cfg['model_size']}",
+            device=0
         )
 
-        self.log("RT-DETR training finished.\n")
+        best_path = f"{results.save_dir}/weights/best.pt"
+
+        self._log(f"RT-DETR done: {best_path}")
+
+        return best_path
+
+    def _log(self, msg):
+        if self.log:
+            self.log(msg)

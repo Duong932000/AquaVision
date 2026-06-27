@@ -1,6 +1,6 @@
 
-from utils.load_config import InitialConfigLoader
 from ui.window import MainWindow
+from utils.load_config import InitialConfigLoader
 
 def SlothStudio():
 
