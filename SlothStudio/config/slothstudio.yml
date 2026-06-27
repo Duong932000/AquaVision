@@ -70,7 +70,7 @@ inference:
       default_size: m
 
   tracking:
-    enabled: true
+    enabled: True
     default_tracker: BoT-SORT
 
   detection:
@@ -89,7 +89,7 @@ inference:
         - 960
         - 1280
     fp16:
-      default: true
+      default: True
     max_detection:
       default: 300
       options:
@@ -97,12 +97,11 @@ inference:
         - 300
         - 500
         - 1000
-
   output:
     save_video:
-      default: true
+      default: True
     save_frames:
-      default: true
+      default: False
 
   runtime:
     default_device: CUDA
@@ -110,7 +109,7 @@ inference:
       - Auto
       - CUDA
       - CPU
-    
+
 # TRAINING CONFIGURATION
 training:
   dataset:
@@ -121,6 +120,10 @@ training:
     default_family: YOLO
     default_version: YOLO26
     default_size: m
+    model_family:
+      - YOLO
+      - RF-DETR
+      - RT-DETR
 
   hyperparameters:
     epochs:
@@ -146,7 +149,7 @@ training:
     workers:
       default: 8
     amp:
-      default: true
+      default: True
     device:
       default: GPU
       options:
@@ -155,12 +158,12 @@ training:
 
   validation:
     run_validation:
-      default: true
+      default: False
     show_result:
-      default: true
+      default: False
   
   export:
     onnx:
-      enabled: true
+      default: False
     tensorrt:
-      enabled: true
+      default: False
