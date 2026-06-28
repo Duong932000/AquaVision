@@ -8,7 +8,6 @@ from processor.validation_processor import ValidationProcessor
 from processor.models_export_processor import ModelsExportProcessor
 
 class TrainingProcessor:
-
     def __init__(self, config, log_callback=None):
 
         self.config = self._normalize_config(config)

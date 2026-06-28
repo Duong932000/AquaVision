@@ -37,6 +37,17 @@ class MainWindow(DnD):
         self.train_cfg = self.init_cfg["training"]
 
         # --------------------------------------------------------------------------#
+        # MODELS VARIABLES ---------------------------------------------------------#
+        # --------------------------------------------------------------------------#
+        self.yolo_versions_list_var = self.model_cfg["families"]["yolo"]["versions"]      # ["YOLO26", "YOLO12", "YOLO11", "YOLOv10", "YOLOv9", "YOLOv9", "YOLOv8"]
+        self.yolo_sizes_list_var = self.model_cfg["families"]["yolo"]["sizes"]            # ["n", "s", "m", "l", "x"]
+        self.rtdetr_versions_list_var = self.model_cfg["families"]["rt-detr"]["versions"] # ["RT-DETR", "RT-DETRv2"]
+        self.rtdetr_sizes_list_var = self.model_cfg["families"]["rt-detr"]["sizes"]       # ["l", "x"]
+        self.rfdetr_versions_list_var = self.model_cfg["families"]["rf-detr"]["versions"] # ["RF-DETR"]
+        self.rfdetr_sizes_list_var = self.model_cfg["families"]["rf-detr"]["sizes"]       # ["n", "s", "m", "l", "xl", "2xl"]
+
+
+        # --------------------------------------------------------------------------#
         # INFERENCE VARIABLES ------------------------------------------------------#
         # --------------------------------------------------------------------------#
         # inference mode
@@ -49,6 +60,8 @@ class MainWindow(DnD):
         self.source_type_var \
             = customtkinter.StringVar(
                 value=self.inference_cfg["source"]["default_type"])
+
+        self.source_type_list_var = self.inference_cfg["source"]["source_types"]
 
         # variables for source local
         self.selected_local_sources = []
@@ -79,19 +92,30 @@ class MainWindow(DnD):
         self.tracker_var \
             = customtkinter.StringVar(
                 value=self.inference_cfg["tracking"]["default_tracker"])
+        
+        self.tracker_list_var \
+            = self.tracker_cfg["availabel"]  # ["BoT-SORT", "ByteTrack", "Deep OC-SORT", "OC-SORT", "FastTracker", "TrackTrack"]
 
         # variable for detection
         self.confidence_var \
             = customtkinter.DoubleVar(
                 value=self.inference_cfg["detection"]["confidence"]["default"])
+        
+        self.confidence_min_var = self.inference_cfg["detection"]["confidence"]["min"]
+        self.confidence_max_var = self.inference_cfg["detection"]["confidence"]["max"]
 
+        # IOU - Intersection over Union
         self.iou_var \
             = customtkinter.DoubleVar(
                 value=self.inference_cfg["detection"]["iou"]["default"])
 
+        self.iou_min_var = self.inference_cfg["detection"]["iou"]["min"]
+        self.iou_max_var = self.inference_cfg["detection"]["iou"]["max"]
+
         self.image_size_var \
             = customtkinter.StringVar(
                 value=self.inference_cfg["detection"]["image_size"]["default"])
+        self.image_size_list_var = self.inference_cfg["detection"]["image_size"]["options"]
 
         self.fp16_enabled_var \
             = customtkinter.BooleanVar(
@@ -100,6 +124,7 @@ class MainWindow(DnD):
         self.max_detection_var \
             = customtkinter.StringVar(
                 value=self.inference_cfg["detection"]["max_detection"]["default"])
+        self.max_detection_list_var = self.inference_cfg["detection"]["max_detection"]["options"]
 
         # varible for output mode
         self.save_video_var \
@@ -114,6 +139,7 @@ class MainWindow(DnD):
         self.device_var \
             = customtkinter.StringVar(
                 value=self.inference_cfg["runtime"]["default_device"])
+        self.device_list_var = self.inference_cfg["runtime"]["options"]
 
         # flag of inference processor
         self.inference_processor = None
@@ -497,7 +523,7 @@ class MainWindow(DnD):
                                           width=200,
                                           height=30,
                                           variable=self.source_type_var,
-                                          values=["Youtube URL", "Local Files"],
+                                          values=self.source_type_list_var,
                                           command=self.UpdateUISourceTypeChanged_Event)
         self.source_type_optionmenu.pack(anchor="w", padx=5, pady=(10, 5))
 
@@ -761,11 +787,6 @@ class MainWindow(DnD):
 
     def AppendInferenceLog_Event(self, log_type, message):
 
-        # self.inference_log_textbox.append_log(log_type, message)
-
-        # if self.inference_mode:
-        #     self.inference_runtime_mode_log_textbox.append_log(log_type, message)
-
         targets = [self.inference_log_textbox]
 
         if self.inference_mode:
@@ -853,13 +874,13 @@ class MainWindow(DnD):
         self.pretrained_model_version_optionmenu \
             = customtkinter.CTkOptionMenu(self.pretrained_model_frame,
                                           variable=self.pretrained_version_var,
-                                          values=["YOLO26", "YOLO12", "YOLO11", "YOLOv8"])
+                                          values=self.yolo_versions_list_var)
         self.pretrained_model_version_optionmenu.pack(fill="x", pady=(0, 10))
 
         self.pretrained_model_type_optionmenu \
             = customtkinter.CTkOptionMenu(self.pretrained_model_frame,
                                          variable=self.pretrained_size_var,
-                                         values=["n", "s", "m", "l", "x"])
+                                         values=self.yolo_sizes_list_var)
         self.pretrained_model_type_optionmenu.pack(fill="x")
 
         #-------------------------------------------------------------------------------#
@@ -884,12 +905,7 @@ class MainWindow(DnD):
         self.tracker_combobox \
             = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                         variable=self.tracker_var,
-                                        values=["BoT-SORT",
-                                                "ByteTrack",
-                                                "Deep OC-SORT",
-                                                "OC-SORT",
-                                                "FastTracker",
-                                                "TrackTrack"])
+                                        values=self.tracker_list_var)
         self.tracker_combobox.set("BoT-SORT")
         self.tracker_combobox.pack(fill="x", padx=10, pady=10)
 
@@ -923,8 +939,8 @@ class MainWindow(DnD):
             = customtkinter.CTkSlider(self.inference_control_scroll_frame,
                                       variable=self.confidence_var,
                                       command=self.ConfidenceSlider_Event,
-                                      from_=0.05,
-                                      to=1.0)
+                                      from_=self.confidence_min_var,
+                                      to=self.confidence_max_var)
         self.confidence_slider.set(0.25)
         self.confidence_slider.pack(fill="x", padx=10, pady=0)
 
@@ -946,7 +962,8 @@ class MainWindow(DnD):
             = customtkinter.CTkSlider(self.inference_control_scroll_frame,
                                       variable=self.iou_var,
                                       command=self.IoUSlider_Event,
-                                      from_=0.1, to=1.0)
+                                      from_=self.iou_min_var,
+                                      to=self.iou_max_var)
         self.iou_slider.set(0.45)
         self.iou_slider.pack(fill="x", padx=10, pady=0)
 
@@ -961,7 +978,7 @@ class MainWindow(DnD):
             = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                         variable=self.image_size_var,
                                         width=300,
-                                        values=["640", "960", "1280"])
+                                        values=self.image_size_list_var)
         self.image_size_combobox.set("640")
         self.image_size_combobox.pack(anchor="w", padx=10, pady=(5, 5))
 
@@ -983,7 +1000,7 @@ class MainWindow(DnD):
             = customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                         variable=self.max_detection_var,
                                         width=300,
-                                        values=["100", "300", "500", "1000"])
+                                        values=self.max_detection_list_var)
         self.max_detection_combobox.set("100")
         self.max_detection_combobox.pack(anchor="w", padx=10, pady=(5, 5))
 
@@ -1019,7 +1036,7 @@ class MainWindow(DnD):
         self.device_combobox = \
             customtkinter.CTkComboBox(self.inference_control_scroll_frame,
                                       variable=self.device_var,
-                                      values=["Auto", "CPU", "CUDA"])
+                                      values=self.device_list_var)
         self.device_combobox.set("CUDA")
         self.device_combobox.pack(fill="x", padx=10, pady=5)
 
@@ -1119,6 +1136,7 @@ class MainWindow(DnD):
         }
 
         self.inference_config = config
+        print("self.inference_config: \n", self.inference_config)
 
         return config
 
@@ -1182,8 +1200,8 @@ class MainWindow(DnD):
 
         self.inference_processor \
             = InferenceProcessor(config=self.inference_config,
-                                frame_callback=self.EnqueueInferenceFrame_Event,
-                                log_callback=self.AppendInferenceLog_Event)
+                                 frame_callback=self.EnqueueInferenceFrame_Event,
+                                 log_callback=self.AppendInferenceLog_Event)
         self.inference_processor.start()
 
         self.AppendInferenceLog_Event("INFO", "Inference started")

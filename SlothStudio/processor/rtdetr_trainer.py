@@ -5,27 +5,15 @@ from processor.model_resolver import ModelResolver
 from utils.ultralytics_log import UltralyticsUILogHandler
 
 class RTDETRTrainer:
+    def __init__(self, config, log_callback=None):
 
-    def __init__(
-            self,
-            cfg,
-            log_callback=None):
-
-        self.cfg = cfg
+        self.config = config
         self.log_callback = log_callback
-
         self.logger_handler = None
 
-    def log(
-            self,
-            level,
-            message):
+    def log(self, level, message):
 
-        if self.log_callback:
-            self.log_callback(
-                level,
-                message
-            )
+        if self.log_callback:self.log_callback(level, message)
 
     def stop(self):
 
@@ -34,9 +22,9 @@ class RTDETRTrainer:
     def train(self):
 
         model_name = ModelResolver.get_model_name(
-            self.cfg["model_family"],
-            self.cfg["model_version"],
-            self.cfg["model_size"]
+            self.config["model_family"],
+            self.config["model_version"],
+            self.config["model_size"]
         )
 
         self.log(

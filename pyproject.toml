@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aquavision"
-version = "0.1.0"
+version = "1.0.0.dev"
 description = "AI-powered fish tracking and monitoring platform for aquaculture"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,10 @@ authors = [
     { name = "Dac Duong" }
 ]
 
+keywords = ["machine-learning", "deep-learning", "vision", "ML", "DL", "AI", "YOLO", "DETR", "RF-DETR", "RT-DETR", "Roboflow"] 
+
 dependencies = [
+    "requests",
     "ultralytics>=8.3.0",
     "opencv-python>=4.10.0",
     "numpy>=2.0.0",

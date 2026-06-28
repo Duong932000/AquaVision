@@ -12,7 +12,7 @@ from datetime import datetime
 from utils.load_config import _get_root_dir
 
 class InferenceProcessor:
-    def __init__(self, config, frame_callback=None,log_callback=None):
+    def __init__(self, config, frame_callback=None, log_callback=None):
         
         # varible of json config (come from UI configure)
         self.inference_config = config
