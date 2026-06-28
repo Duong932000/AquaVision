@@ -1136,7 +1136,6 @@ class MainWindow(DnD):
         }
 
         self.inference_config = config
-        print("self.inference_config: \n", self.inference_config)
 
         return config
 
@@ -1285,6 +1284,7 @@ class MainWindow(DnD):
 
         self.TrainingLog_WidgetsConfigure()
 
+    # Training Configuration --------------------------------------#
     def TrainingConfiguration_WidgetsConfigure(self):
 
         # TABVIEW --------------------------------------------------------------#
@@ -1337,7 +1337,7 @@ class MainWindow(DnD):
         self.model_title_label \
             = customtkinter.CTkLabel(self.training_scroll_frame,
                                      text="✓ Model",
-                                     font=customtkinter.CTkFont(size=20, weight="bold"))
+                                     font=customtkinter.CTkFont(size=22, weight="bold"))
         self.model_title_label.pack(anchor="w", padx=10, pady=(20, 5))
 
         self.model_family_label \
@@ -1394,7 +1394,6 @@ class MainWindow(DnD):
 
         self.epochs_entry \
             = customtkinter.CTkEntry(self.training_scroll_frame,
-                                     width=30,
                                      textvariable=self.epochs_var)
         self.epochs_entry.pack(fill="both", padx=10, pady=(5, 10))
         
@@ -1419,7 +1418,7 @@ class MainWindow(DnD):
         self.train_image_size_optionmenu \
             = customtkinter.CTkOptionMenu(self.training_scroll_frame,
                                           variable=self.train_image_size_var,
-                                          values=list(self.train_image_size_list_var))
+                                          values=self.train_image_size_list_var)
         self.train_image_size_optionmenu.pack(fill="both", padx=10, pady=(5, 10))
 
         self.enabled_amp_fp16_checkbox \
@@ -1479,6 +1478,7 @@ class MainWindow(DnD):
                                       text="Stop Training",
                                       state="disabled",
                                       height=40,
+                                      fg_color="#FF6B6B",
                                       command=self.StopTraining_Event,
                                       font=customtkinter.CTkFont(size=18, weight="bold"))
         self.stop_training_button.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
@@ -1496,9 +1496,7 @@ class MainWindow(DnD):
 
     def ModelFamilyChanged_Event(self, value):
 
-        family_key = value.lower()
-
-        family_cfg = self.model_cfg["families"][family_key]
+        family_cfg = self.model_cfg["families"][value.lower()]
 
         version_list = family_cfg["versions"]
         size_list = family_cfg["sizes"]
@@ -1571,6 +1569,7 @@ class MainWindow(DnD):
 
         return config
 
+    # Training Configuration --------------------------------------#
     def TrainingLog_WidgetsConfigure(self):
 
         self.training_log_toolbar = customtkinter.CTkFrame(self.training_log_frame, fg_color="transparent")
@@ -1580,7 +1579,8 @@ class MainWindow(DnD):
             = customtkinter.CTkButton(self.training_log_toolbar,
                                       text="Clear Log",
                                       width=120,
-                                      command=self.ClearLog_Event,
+                                      command=self.ClearTrainingLog_Event,
+                                      fg_color="#FF6B6B",
                                       font=customtkinter.CTkFont(size=14))
         self.clear_log_button.pack(side="left", padx=5)
 
@@ -1588,9 +1588,8 @@ class MainWindow(DnD):
             = customtkinter.CTkButton(self.training_log_toolbar,
                                       text="Save Log",
                                       width=120,
-                                      command=self.SaveLog_Event,
+                                      command=self.SaveTrainingLog_Event,
                                       font=customtkinter.CTkFont(size=14))
-
         self.save_log_button.pack(side="right", padx=5)
 
         self.training_log_textbox \
@@ -1610,13 +1609,15 @@ class MainWindow(DnD):
             )
         )
 
-    def ClearLog_Event(self):
+    def ClearTrainingLog_Event(self):
 
-        self.training_log_textbox.delete("1.0", "end")
+        self.training_log_textbox.clear()
 
-    def SaveLog_Event(self):
+    def SaveTrainingLog_Event(self):
 
-        pass
+        success = self.training_log_textbox.save_to_file()
+        if success:
+            self.AppendInferenceLog_Event("SUCCESS", "Training Log saved")
 
     def StartTraining_Event(self):
         
@@ -1635,8 +1636,6 @@ class MainWindow(DnD):
         if self.training_processor:
             self.training_processor.stop()
         
-        # self.AppendTrainingLog_Event("INFO", "Training Stopped")
-
     # DATASET PANEL SETUP -----------------------------------------#
     # -------------------------------------------------------------#
     def DatasetPanel_Adapter(self):

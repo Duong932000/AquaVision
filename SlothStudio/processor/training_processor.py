@@ -1,56 +1,33 @@
+
+import shutil
 import threading
+from pathlib import Path
+from datetime import datetime
 
-from processor.yolo_trainer import YOLOTrainer
-from processor.rtdetr_trainer import RTDETRTrainer
-from processor.rfdetr_trainer import RFDETRTrainer
-
-from processor.validation_processor import ValidationProcessor
-from processor.models_export_processor import ModelsExportProcessor
+# internal modules
+from utils.load_config import _get_root_dir
+from trainer.yolo_trainer import YOLOTrainer
+# from trainer.rtdetr_trainer import RTDETRTrainer
+# from trainer.rfdetr_trainer import RFDETRTrainer
+# from processor.validation_processor import ValidationProcessor
+# from processor.models_export_processor import ModelsExportProcessor
 
 class TrainingProcessor:
     def __init__(self, config, log_callback=None):
 
-        self.config = self._normalize_config(config)
+        self.config = config
 
         self.log_callback = log_callback
+
         self.thread = None
+
         self.trainer = None
 
-    def _normalize_config(self, cfg):
+        self.running = False
 
-        dataset_yaml = cfg["dataset"]["dataset_yaml"]
-
-        # FIX tuple-string bug
-        if isinstance(dataset_yaml, str):
-            dataset_yaml = dataset_yaml.strip()
-
-            # remove ("path",) artifact
-            if dataset_yaml.startswith("(") and dataset_yaml.endswith(")"):
-                dataset_yaml = dataset_yaml.strip("()").replace(",", "").replace("'", "").strip()
-
-        return {
-            # dataset
-            "dataset_yaml": dataset_yaml,
-
-            # model
-            "model_family": cfg["model"]["family"],
-            "model_version": cfg["model"]["version"],
-            "model_size": cfg["model"]["size"],
-
-            # hyperparameters
-            "epochs": int(cfg["hyperparameters"]["epochs"]),
-            "batch_size": int(cfg["hyperparameters"]["batch_size"]),
-            "image_size": int(cfg["hyperparameters"]["image_size"]),
-            "amp_fp16": bool(cfg["hyperparameters"]["amp_fp16"]),
-
-            # validation
-            "run_validation": bool(cfg["validation"]["run_validation"]),
-            "show_results": bool(cfg["validation"]["show_results"]),
-
-            # export
-            "export_onnx": bool(cfg["export"]["onnx"]),
-            "export_tensorrt": bool(cfg["export"]["tensorrt"]),
-        }
+        # get root dir
+        self.root_dir = _get_root_dir()
+        self.output_dir = None
 
     def log(self, level, message):
 
@@ -59,76 +36,97 @@ class TrainingProcessor:
 
     def create_trainer(self):
 
-        family = self.config["model_family"]
+        model_family = self.config["model"]["family"]
 
-        if family == "YOLO":
+        if model_family == "YOLO":
             return YOLOTrainer(self.config, self.log_callback)
+        
+        # if model_family == "RF-DETR":
+        #     return RFDETRTrainer(self.config, self.log_callback)
 
-        if family == "RT-DETR":
-            return RTDETRTrainer(self.config, self.log_callback)
-
-        if family == "RF-DETR":
-            return RFDETRTrainer(self.config, self.log_callback)
-
-        raise ValueError(f"Unsupported model family: {family}")
-
+        # if model_family == "RT-DETR":
+        #     return RTDETRTrainer(self.config, self.log_callback)
+        
+        raise RuntimeError(f"Unsupported model family {model_family}")
+    
     def start(self):
+
+        if self.running:
+            self.log("WARNING", "Training model process already running")
+            return
+        
+        self.running = True
+
+        self.setup_output_dir()
 
         self.thread = threading.Thread(target=self.worker, daemon=True)
         self.thread.start()
 
     def stop(self):
 
+        self.running = False
+
         if self.trainer:
             self.trainer.stop()
+
+    def setup_output_dir(self):
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        self.output_dir = (Path(self.root_dir) / "outputs" / "train" / f"train-{timestamp}")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.log("INFO", f"Output directory: {self.output_dir}")
+
+    def copy_training_artifacts(self, result):
+
+        if not result:
+            return
+
+        best_model = Path(result.best_model)
+        last_model = Path(result.last_model)
+
+        if best_model.exists():
+            shutil.copy2(best_model, self.output_dir / "best.pt")
+            self.log("INFO",f"Saved best.pt")
+
+        if last_model.exists():
+            shutil.copy2(last_model, self.output_dir / "last.pt")
+            self.log("INFO", f"Saved last.pt")
 
     def worker(self):
 
         try:
+            self.log("INFO", "=" * 70)
+            self.log("INFO", "TRAINING STARTED")
+            self.log("INFO", "=" * 70)
 
-            self.log(
-                "INFO",
-                "TRAINING STARTED"
-            )
-
+            # perform training
             self.trainer = self.create_trainer()
+            result = self.trainer.train()
+            if result is None:
+                self.log("WARNING", "Training cancelled")
+                return
 
-            model_path = self.trainer.train()
+            self.copy_training_artifacts(result)
 
-            if self.config["run_validation"]:
+            # # validation model after training
+            # if self.config["validation"]["run_validation"]:
+            #     validator = ValidationProcessor(self.config, self.log_callback)
+            #     validator.run_validate(result.best_model)
 
-                validator = ValidationProcessor(
-                    self.log_callback
-                )
+            # # export model onnx
+            # if self.config["export"]["onnx"]:
+            #     exporter = ModelsExportProcessor(result.best_model, self.log_callback)
+            #     exporter.export_onnx()
 
-                validator.validate(
-                    model_path
-                )
+            # if self.config["export"]["tensorrt"]:
+            #     exporter = ModelsExportProcessor(result.best_model, self.log_callback)
+            #     exporter.export_tensorrt()
 
-            exporter = ModelsExportProcessor(
-                self.log_callback
-            )
+            self.log("SUCCESS", "TRAINING COMPLETED")
 
-            if self.config["export_onnx"]:
-
-                exporter.export_onnx(
-                    model_path
-                )
-
-            if self.config["export_tensorrt"]:
-
-                exporter.export_tensorrt(
-                    model_path
-                )
-
-            self.log(
-                "INFO",
-                "PIPELINE COMPLETED"
-            )
-
-        except Exception as error:
-
-            self.log(
-                "ERROR",
-                str(error)
-            )
+        except Exception as e:
+            self.log("ERROR", str(e))
+        finally:
+            self.running = False

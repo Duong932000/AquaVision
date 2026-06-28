@@ -2,6 +2,9 @@
 import customtkinter
 from datetime import datetime
 
+# internal modules
+from utils.filedialog import FileDialogUtils
+
 class LogTextboxUtils(customtkinter.CTkTextbox):
 
     LOG_COLORS = {
@@ -43,6 +46,20 @@ class LogTextboxUtils(customtkinter.CTkTextbox):
     def append(self, message):
 
         self.log("INFO", message)
+
+    def save_to_file(self):
+
+        filepath = FileDialogUtils.SaveFiles()
+
+        if not filepath:
+            return False
+
+        content = self.get("1.0", "end")
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        return True
 
     def clear(self):
 
