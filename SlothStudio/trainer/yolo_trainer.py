@@ -3,7 +3,6 @@ from pathlib import Path
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 
-from trainer.train_results import TrainingResult
 from utils.ultralytics_log import UltralyticsUILogHandler
 
 
@@ -116,11 +115,7 @@ class YOLOTrainer:
                 "Training completed"
             )
 
-            return TrainingResult(
-                save_dir=str(save_dir),
-                best_model=str(best_model),
-                last_model=str(last_model)
-            )
+            return best_model, last_model
 
         finally:
 

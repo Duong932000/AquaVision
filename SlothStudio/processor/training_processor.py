@@ -78,13 +78,7 @@ class TrainingProcessor:
 
         self.log("INFO", f"Output directory: {self.output_dir}")
 
-    def copy_training_artifacts(self, result):
-
-        if not result:
-            return
-
-        best_model = Path(result.best_model)
-        last_model = Path(result.last_model)
+    def copy_training_artifacts(self, best_model, last_model):
 
         if best_model.exists():
             shutil.copy2(best_model, self.output_dir / "best.pt")
@@ -103,12 +97,8 @@ class TrainingProcessor:
 
             # perform training
             self.trainer = self.create_trainer()
-            result = self.trainer.train()
-            if result is None:
-                self.log("WARNING", "Training cancelled")
-                return
-
-            self.copy_training_artifacts(result)
+            best_model, last_model = self.trainer.train()
+            self.copy_training_artifacts(best_model, last_model)
 
             # # validation model after training
             # if self.config["validation"]["run_validation"]:
