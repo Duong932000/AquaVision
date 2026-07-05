@@ -3,124 +3,66 @@ from pathlib import Path
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 
+from processor.model_resolver import ModelResolver
+from trainer.base_trainer import BaseTrainer
 from utils.ultralytics_log import UltralyticsUILogHandler
 
 
-class YOLOTrainer:
+class YOLOTrainer(BaseTrainer):
 
-    def __init__(
-            self,
-            config,
-            log_callback=None):
-
-        self.config = config
-
-        self.log_callback = log_callback
+    def __init__(self, config, log_callback=None):
+        super().__init__(config, log_callback)
 
         self.logger_handler = None
 
-    def log(
-            self,
-            level,
-            message):
-
-        if self.log_callback:
-            self.log_callback(
-                level,
-                message
-            )
-
-    def stop(self):
-
-        #
-        # TODO
-        # future multiprocessing stop
-        #
-        pass
-
     def build_model_name(self):
 
-        version = (
-            self.config["model"]["version"]
+        model_cfg = self.config["model"]
+
+        return ModelResolver.get_model_name(
+            model_cfg["family"],
+            model_cfg["version"],
+            model_cfg["size"],
         )
 
-        size = (
-            self.config["model"]["size"]
-        )
+    def _on_epoch_end(self, trainer):
 
-        return (
-            f"{version.lower()}{size}.pt"
-        )
+        if self.stop_event.is_set():
+            trainer.stop = True
 
     def train(self):
 
-        model_name = (
-            self.build_model_name()
-        )
+        model_name = self.build_model_name()
 
-        self.log(
-            "INFO",
-            f"Loading model: {model_name}"
-        )
+        self.log("INFO", f"Loading model: {model_name}")
 
-        self.logger_handler = (
-            UltralyticsUILogHandler(
-                self.log_callback
-            )
-        )
-
-        LOGGER.addHandler(
-            self.logger_handler
-        )
+        self.logger_handler = UltralyticsUILogHandler(self.log_callback)
+        LOGGER.addHandler(self.logger_handler)
 
         try:
+            self.model = YOLO(model_name)
+            self.model.add_callback("on_train_epoch_end", self._on_epoch_end)
 
-            #
-            # Auto download
-            #
-            model = YOLO(
-                model_name
-            )
+            hyperparams = self.config["hyperparameters"]
 
-            results = model.train(
+            results = self.model.train(
                 data=self.config["dataset"]["dataset_yaml"],
-
-                epochs=self.config["hyperparameters"]["epochs"],
-
-                batch=self.config["hyperparameters"]["batch_size"],
-
-                imgsz=self.config["hyperparameters"]["image_size"],
-
-                amp=self.config["hyperparameters"]["amp_fp16"]
+                epochs=hyperparams["epochs"],
+                batch=hyperparams["batch_size"],
+                imgsz=hyperparams["image_size"],
+                amp=hyperparams["amp_fp16"],
             )
 
-            save_dir = Path(
-                results.save_dir
-            )
+            save_dir = Path(results.save_dir)
 
-            best_model = (
-                save_dir
-                / "weights"
-                / "best.pt"
-            )
+            best_model = save_dir / "weights" / "best.pt"
+            last_model = save_dir / "weights" / "last.pt"
 
-            last_model = (
-                save_dir
-                / "weights"
-                / "last.pt"
-            )
-
-            self.log(
-                "SUCCESS",
-                "Training completed"
-            )
+            self.log("SUCCESS", "Training completed")
 
             return best_model, last_model
 
         finally:
 
             if self.logger_handler:
-
-                LOGGER.removeHandler(
-                    self.logger_handler
-                )
+                LOGGER.removeHandler(self.logger_handler)

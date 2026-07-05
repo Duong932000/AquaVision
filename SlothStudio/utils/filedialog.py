@@ -12,7 +12,8 @@ class FileDialogUtils:
         return filedialog.askopenfilename(title=title, filetypes=filetypes)
 
     @staticmethod
-    def SaveFiles(title, filetypes):
+    def SaveFiles(title="Save File", filetypes=(("Log Files", "*.log"), ("Text File", "*.txt"))):
 
-        return filedialog.asksaveasfilename(defaultextension=".log",
-                                            filetypes=[("Log Files", "*.log"), ("Text File", "*.txt")])
+        return filedialog.asksaveasfilename(title=title,
+                                            defaultextension=".log",
+                                            filetypes=filetypes)

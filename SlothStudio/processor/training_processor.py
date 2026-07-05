@@ -7,12 +7,18 @@ from datetime import datetime
 # internal modules
 from utils.load_config import _get_root_dir
 from trainer.yolo_trainer import YOLOTrainer
-# from trainer.rtdetr_trainer import RTDETRTrainer
-# from trainer.rfdetr_trainer import RFDETRTrainer
+from trainer.rtdetr_trainer import RTDETRTrainer
+from trainer.rfdetr_trainer import RFDETRTrainer
 # from processor.validation_processor import ValidationProcessor
 # from processor.models_export_processor import ModelsExportProcessor
 
 class TrainingProcessor:
+
+    TRAINER_CLASSES = {
+        "YOLO": YOLOTrainer,
+        "RT-DETR": RTDETRTrainer,
+        "RF-DETR": RFDETRTrainer,
+    }
     def __init__(self, config, log_callback=None):
 
         self.config = config
@@ -38,16 +44,12 @@ class TrainingProcessor:
 
         model_family = self.config["model"]["family"]
 
-        if model_family == "YOLO":
-            return YOLOTrainer(self.config, self.log_callback)
-        
-        # if model_family == "RF-DETR":
-        #     return RFDETRTrainer(self.config, self.log_callback)
+        trainer_cls = self.TRAINER_CLASSES.get(model_family)
 
-        # if model_family == "RT-DETR":
-        #     return RTDETRTrainer(self.config, self.log_callback)
-        
-        raise RuntimeError(f"Unsupported model family {model_family}")
+        if trainer_cls is None:
+            raise RuntimeError(f"Unsupported model family {model_family}")
+
+        return trainer_cls(self.config, self.log_callback)
     
     def start(self):
 

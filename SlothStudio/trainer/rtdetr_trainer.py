@@ -1,74 +1,68 @@
+from pathlib import Path
+
 from ultralytics import RTDETR
 from ultralytics.utils import LOGGER
 
 from processor.model_resolver import ModelResolver
+from trainer.base_trainer import BaseTrainer
 from utils.ultralytics_log import UltralyticsUILogHandler
 
-class RTDETRTrainer:
-    def __init__(self, config, log_callback=None):
 
-        self.config = config
-        self.log_callback = log_callback
+class RTDETRTrainer(BaseTrainer):
+
+    def __init__(self, config, log_callback=None):
+        super().__init__(config, log_callback)
+
         self.logger_handler = None
 
-    def log(self, level, message):
+    def build_model_name(self):
 
-        if self.log_callback:self.log_callback(level, message)
+        model_cfg = self.config["model"]
 
-    def stop(self):
+        return ModelResolver.get_model_name(
+            model_cfg["family"],
+            model_cfg["version"],
+            model_cfg["size"],
+        )
 
-        pass
+    def _on_epoch_end(self, trainer):
+
+        if self.stop_event.is_set():
+            trainer.stop = True
 
     def train(self):
 
-        model_name = ModelResolver.get_model_name(
-            self.config["model_family"],
-            self.config["model_version"],
-            self.config["model_size"]
-        )
+        model_name = self.build_model_name()
 
-        self.log(
-            "INFO",
-            f"Loading model: {model_name}"
-        )
+        self.log("INFO", f"Loading model: {model_name}")
 
-        self.logger_handler = UltralyticsUILogHandler(
-            self.log_callback
-        )
-
-        LOGGER.addHandler(
-            self.logger_handler
-        )
+        self.logger_handler = UltralyticsUILogHandler(self.log_callback)
+        LOGGER.addHandler(self.logger_handler)
 
         try:
+            self.model = RTDETR(model_name)
+            self.model.add_callback("on_train_epoch_end", self._on_epoch_end)
 
-            model = RTDETR(
-                model_name
+            hyperparams = self.config["hyperparameters"]
+
+            results = self.model.train(
+                data=self.config["dataset"]["dataset_yaml"],
+                epochs=hyperparams["epochs"],
+                batch=hyperparams["batch_size"],
+                imgsz=hyperparams["image_size"],
+                amp=hyperparams["amp_fp16"],
             )
 
-            results = model.train(
-                data=self.cfg["dataset_yaml"],
-                epochs=self.cfg["epochs"],
-                batch=self.cfg["batch_size"],
-                imgsz=self.cfg["image_size"],
-                amp=self.cfg["amp_fp16"]
-            )
+            save_dir = Path(results.save_dir)
 
-            best_model = (
-                f"{results.save_dir}/weights/best.pt"
-            )
+            best_model = save_dir / "weights" / "best.pt"
+            last_model = save_dir / "weights" / "last.pt"
 
-            self.log(
-                "INFO",
-                f"Training completed: {best_model}"
-            )
+            self.log("SUCCESS", "Training completed")
 
-            return best_model
+            return best_model, last_model
 
         finally:
 
             if self.logger_handler:
-
-                LOGGER.removeHandler(
-                    self.logger_handler
-                )
+                LOGGER.removeHandler(self.logger_handler)
